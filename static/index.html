@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8f5">
+  <title>Clara — suas finanças em perspectiva</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div id="loading" class="loading-screen">Carregando suas finanças…</div>
+
+  <main id="auth" class="auth-layout hidden">
+    <section class="brand-panel" aria-label="Apresentação">
+      <div class="brand"><span class="brand-mark">✳</span> clara<span class="brand-dot">.</span></div>
+      <div class="brand-content">
+        <span class="eyebrow light">CONTROLE COM LEVEZA</span>
+        <h1>Seu dinheiro,<br><em>mais claro.</em></h1>
+        <p>Organize compromissos, acompanhe cada mês e tome decisões com tranquilidade.</p>
+        <div class="brand-card">
+          <div class="brand-card-top"><span>Visão do mês</span><span class="mini-icon">↗</span></div>
+          <div class="brand-card-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="brand-card-bottom"><span>Todos os seus custos em um só lugar</span><span>✦</span></div>
+        </div>
+      </div>
+      <span class="brand-footer">SIMPLES. PESSOAL. SEU.</span>
+    </section>
+
+    <section class="auth-panel">
+      <div class="mobile-brand brand"><span class="brand-mark">✳</span> clara<span class="brand-dot">.</span></div>
+      <div class="auth-box">
+        <div class="auth-heading">
+          <span class="eyebrow">SEU ESPAÇO FINANCEIRO</span>
+          <h2 id="auth-title">Bem-vindo de volta<span>.</span></h2>
+          <p id="auth-subtitle">Entre na sua conta para continuar de onde parou.</p>
+        </div>
+        <form id="auth-form" novalidate>
+          <div id="name-field" class="field hidden"><label for="name">Seu nome</label><input id="name" name="name" autocomplete="name" placeholder="Como podemos chamar você?"></div>
+          <div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="email" placeholder="voce@exemplo.com" required></div>
+          <div class="field"><div class="label-row"><label for="password">Senha</label><span id="password-hint" class="hidden">Mínimo de 8 caracteres</span></div><div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Digite sua senha" required><button id="toggle-password" class="password-toggle" type="button" aria-label="Mostrar senha">Mostrar</button></div></div>
+          <p id="auth-error" class="form-error" role="alert" aria-live="polite"></p>
+          <button id="auth-submit" class="primary-button" type="submit">Entrar na minha conta <span>→</span></button>
+        </form>
+        <p class="auth-switch"><span id="switch-prompt">Ainda não tem uma conta?</span> <button id="switch-mode" type="button">Criar conta</button></p>
+        <div class="privacy-note"><span>✳</span> Seus dados ficam em uma conta só sua.</div>
+      </div>
+      <div class="auth-footnote">Feito para uma vida financeira mais leve.</div>
+    </section>
+  </main>
+
+  <main id="dashboard" class="dashboard hidden">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">✳</span> clara<span class="brand-dot">.</span></div>
+      <nav aria-label="Navegação principal"><a class="nav-active" href="#inicio"><span>▦</span> Visão geral</a><a href="#lancamentos"><span>≡</span> Lançamentos</a></nav>
+      <div class="sidebar-bottom"><div class="avatar" id="avatar">U</div><div class="sidebar-user"><strong id="sidebar-name"></strong><small>Minha conta</small></div><button id="logout" title="Sair da conta" aria-label="Sair da conta">↪</button></div>
+    </aside>
+    <div class="dashboard-main">
+      <header class="topbar"><div class="mobile-brand brand"><span class="brand-mark">✳</span> clara<span class="brand-dot">.</span></div><span>Seu espaço financeiro</span><button id="mobile-logout" type="button">Sair</button></header>
+      <div class="content" id="inicio">
+        <div class="page-header"><div><span class="eyebrow">PAINEL FINANCEIRO</span><h1>Olá, <span id="greeting-name"></span> <span class="wave">✳</span></h1><p>Seu dinheiro em perspectiva, um mês de cada vez.</p></div><button id="new-expense" class="primary-button compact" type="button">+ Novo lançamento</button></div>
+        <div class="month-bar"><div><span class="month-icon">▦</span><span>Visão de <strong id="month-label"></strong></span></div><input id="month" type="month" aria-label="Selecionar mês"></div>
+        <section class="summary-grid" aria-label="Resumo do mês"><div class="summary-card featured"><span class="summary-icon">↗</span><p>Total de despesas</p><strong id="total-amount">R$ 0,00</strong><small>Compromissos deste mês</small></div><div class="summary-card"><span class="summary-icon lavender">▤</span><p>Cartões de crédito</p><strong id="cards-amount">R$ 0,00</strong><small id="cards-count">0 lançamentos</small></div><div class="summary-card"><span class="summary-icon peach">◎</span><p>Outros compromissos</p><strong id="other-amount">R$ 0,00</strong><small id="other-count">0 lançamentos</small></div></section>
+        <section class="transactions" id="lancamentos"><div class="section-heading"><div><span class="eyebrow">SEUS COMPROMISSOS</span><h2>Lançamentos do mês</h2></div><span id="expense-count" class="count-pill">0 lançamentos</span></div><div id="expense-list" class="expense-list"></div></section>
+      </div>
+    </div>
+  </main>
+
+  <dialog id="expense-dialog" class="expense-dialog"><form id="expense-form" novalidate><div class="dialog-head"><div><span class="eyebrow">NOVO COMPROMISSO</span><h2>Adicionar lançamento</h2></div><button id="close-dialog" class="close-button" type="button" aria-label="Fechar">×</button></div><div class="field"><label for="description">Descrição</label><input id="description" placeholder="Ex.: Fatura de outubro" required maxlength="120"></div><div class="form-row"><div class="field"><label for="kind">Tipo</label><select id="kind"><option>Cartão de crédito</option><option>Cheque especial</option><option>Empréstimo</option><option>Outros</option></select></div><div class="field"><label for="account">Conta ou cartão</label><input id="account" placeholder="Ex.: Nubank" required maxlength="80"></div></div><div class="form-row"><div class="field"><label for="amount">Valor (R$)</label><input id="amount" type="number" min="0.01" max="10000000" step="0.01" placeholder="0,00" required></div><div class="field"><label for="due-date">Data</label><input id="due-date" type="date" required></div></div><p id="expense-error" class="form-error" role="alert" aria-live="polite"></p><button id="save-expense" class="primary-button" type="submit">Salvar lançamento <span>→</span></button></form></dialog>
+</body>
+</html>
