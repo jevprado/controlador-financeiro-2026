@@ -141,6 +141,17 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/me":
             user = self.current_user()
             return self.send_json(HTTPStatus.OK if user else HTTPStatus.UNAUTHORIZED, {"user": user})
+        if path == "/api/accounts":
+            user = self.current_user()
+            if not user:
+                return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
+            with connect() as db:
+                rows = db.execute("""
+                    SELECT account FROM expenses WHERE user_id = ?
+                    GROUP BY account COLLATE NOCASE
+                    ORDER BY account COLLATE NOCASE
+                """, (user["id"],)).fetchall()
+            return self.send_json(HTTPStatus.OK, {"accounts": [row["account"] for row in rows]})
         if path == "/api/expenses":
             user = self.current_user()
             if not user:

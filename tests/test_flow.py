@@ -48,6 +48,12 @@ class FinanceFlowTest(unittest.TestCase):
         status, created, _ = self.call("/api/expenses", "POST", {"description": "Fatura", "kind": "Cartão de crédito", "account": "Cartão A", "amount_cents": 12550, "due_date": "2026-10-15"}, first)
         self.assertEqual(status, 201)
         expense_id = created["id"]
+        self.assertEqual(self.call("/api/accounts", cookie=first)[1]["accounts"], ["Cartão A"])
+        self.assertEqual(self.call("/api/accounts", cookie=second)[1]["accounts"], [])
+        self.assertEqual(self.call("/api/accounts")[0], 401)
+        self.call("/api/expenses", "POST", {"description": "Outra fatura", "kind": "Cartão de crédito", "account": "Cartão A", "amount_cents": 1000, "due_date": "2026-11-15"}, first)
+        self.call("/api/expenses", "POST", {"description": "Empréstimo", "kind": "Empréstimo", "account": "Banco B", "amount_cents": 2000, "due_date": "2026-11-15"}, first)
+        self.assertEqual(self.call("/api/accounts", cookie=first)[1]["accounts"], ["Banco B", "Cartão A"])
         self.assertEqual(len(self.call("/api/expenses?month=2026-10", cookie=first)[1]["expenses"]), 1)
         self.assertEqual(self.call("/api/expenses?month=2026-10", cookie=second)[1]["expenses"], [])
         self.assertEqual(self.call(f"/api/expenses/{expense_id}", "DELETE", cookie=second)[0], 404)

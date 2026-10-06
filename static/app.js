@@ -5,6 +5,8 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(
 let mode = 'login';
 let currentUser = null;
 let expenses = [];
+let accountNames = [];
+let activeAccountOption = -1;
 
 async function api(path, options = {}) {
   let response;
@@ -20,6 +22,7 @@ async function api(path, options = {}) {
 
 function showAuth() {
   currentUser = null;
+  accountNames = [];
   $('#loading').classList.add('hidden');
   $('#dashboard').classList.add('hidden');
   $('#auth').classList.remove('hidden');
@@ -155,16 +158,100 @@ async function loadExpenses() {
 }
 $('#month').addEventListener('change', loadExpenses);
 
+function closeAccountOptions() {
+  $('#account-options').classList.add('hidden');
+  $('#account').setAttribute('aria-expanded', 'false');
+  $('#account').removeAttribute('aria-activedescendant');
+  activeAccountOption = -1;
+}
+
+function setActiveAccountOption(index) {
+  const options = [...$('#account-options').children];
+  activeAccountOption = index;
+  options.forEach((option, position) => option.setAttribute('aria-selected', String(position === index)));
+  if (index >= 0) {
+    $('#account').setAttribute('aria-activedescendant', options[index].id);
+    options[index].scrollIntoView({ block: 'nearest' });
+  } else {
+    $('#account').removeAttribute('aria-activedescendant');
+  }
+}
+
+function renderAccountOptions() {
+  const query = $('#account').value.trim().toLocaleLowerCase('pt-BR');
+  const matches = accountNames.filter((name) => name.toLocaleLowerCase('pt-BR').includes(query));
+  const list = $('#account-options');
+  list.replaceChildren();
+  for (const [index, name] of matches.entries()) {
+    const option = makeElement('button', 'account-option', name);
+    option.type = 'button';
+    option.id = `account-option-${index}`;
+    option.setAttribute('role', 'option');
+    option.setAttribute('aria-selected', 'false');
+    option.addEventListener('click', () => {
+      $('#account').value = name;
+      $('#account').focus();
+      closeAccountOptions();
+    });
+    list.append(option);
+  }
+  activeAccountOption = -1;
+  $('#account').removeAttribute('aria-activedescendant');
+  list.classList.toggle('hidden', !matches.length);
+  $('#account').setAttribute('aria-expanded', String(matches.length > 0));
+}
+
+async function loadAccountNames() {
+  const userId = currentUser?.id;
+  try {
+    const { accounts } = await api('/api/accounts');
+    if (currentUser?.id !== userId) return;
+    accountNames = accounts;
+    if ($('#expense-dialog').open && document.activeElement === $('#account')) renderAccountOptions();
+  } catch {
+    // Suggestions are optional; typing a new name remains available.
+  }
+}
+
+$('#account').addEventListener('focus', renderAccountOptions);
+$('#account').addEventListener('click', renderAccountOptions);
+$('#account').addEventListener('input', renderAccountOptions);
+$('#account').addEventListener('keydown', (event) => {
+  const list = $('#account-options');
+  const count = list.children.length;
+  if (event.key === 'Escape' && !list.classList.contains('hidden')) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeAccountOptions();
+  } else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && count) {
+    event.preventDefault();
+    if (list.classList.contains('hidden')) renderAccountOptions();
+    const next = event.key === 'ArrowDown'
+      ? (activeAccountOption + 1) % count
+      : (activeAccountOption - 1 + count) % count;
+    setActiveAccountOption(next);
+  } else if (event.key === 'Enter' && !list.classList.contains('hidden') && activeAccountOption >= 0) {
+    event.preventDefault();
+    list.children[activeAccountOption].click();
+  }
+});
+$('.account-combobox').addEventListener('focusout', (event) => {
+  if (!event.currentTarget.contains(event.relatedTarget)) closeAccountOptions();
+});
+
 function openDialog() {
   $('#expense-form').reset();
+  closeAccountOptions();
   $('#expense-error').textContent = '';
   $('#due-date').value = today();
   $('#expense-dialog').showModal();
   $('#description').focus();
+  loadAccountNames();
 }
 $('#new-expense').addEventListener('click', openDialog);
 $('#close-dialog').addEventListener('click', () => $('#expense-dialog').close());
 $('#expense-dialog').addEventListener('click', (event) => { if (event.target === $('#expense-dialog')) $('#expense-dialog').close(); });
+$('#expense-dialog').addEventListener('close', closeAccountOptions);
 $('#expense-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const amount = Number($('#amount').value);
