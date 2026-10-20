@@ -40,6 +40,27 @@ class FinanceFlowTest(unittest.TestCase):
         with response:
             return response.status, json.load(response), response.headers.get("Set-Cookie", "").split(";", 1)[0]
 
+    def test_edit_expense(self):
+        _, _, owner = self.call("/api/register", "POST", {"name": "Caio", "email": "caio@example.com", "password": "senha-segura"})
+        _, _, other = self.call("/api/register", "POST", {"name": "Dani", "email": "dani@example.com", "password": "senha-segura"})
+        original = {"description": "Fatura original", "kind": "Cartão de crédito", "account": "Cartão C", "amount_cents": 12550, "due_date": "2026-10-15"}
+        _, created, _ = self.call("/api/expenses", "POST", original, owner)
+        path = f"/api/expenses/{created['id']}"
+        updated = {"description": "Parcela revisada", "kind": "Empréstimo", "account": "Banco D", "amount_cents": 98765, "due_date": "2026-11-20"}
+        self.assertEqual(self.call(path, "PUT", updated)[0], 401)
+        self.assertEqual(self.call(path, "PUT", updated, other)[0], 404)
+        self.assertEqual(self.call("/api/expenses/999999", "PUT", updated, owner)[0], 404)
+        for invalid in ({"amount_cents": 0}, {"amount_cents": 1.5}, {"due_date": "2026-02-30"}, {"description": ""}, {"kind": "Inválido"}, {"account": ""}):
+            with self.subTest(invalid=invalid):
+                self.assertEqual(self.call(path, "PUT", {**updated, **invalid}, owner)[0], 400)
+        self.assertEqual(self.call(path, "PUT", None, owner)[0], 400)
+        self.assertEqual(self.call("/api/expenses?month=2026-10", cookie=owner)[1]["expenses"], [{"id": created["id"], **original}])
+        self.assertEqual(self.call(path, "PUT", updated, owner)[0], 200)
+        self.assertEqual(self.call("/api/expenses?month=2026-10", cookie=owner)[1]["expenses"], [])
+        self.assertEqual(self.call("/api/expenses?month=2026-11", cookie=owner)[1]["expenses"], [{"id": created["id"], **updated}])
+        self.assertEqual(self.call("/api/accounts", cookie=owner)[1]["accounts"], ["Banco D"])
+        self.assertEqual(self.call(path, "DELETE", cookie=owner)[0], 200)
+
     def test_accounts_are_isolated(self):
         status, _, first = self.call("/api/register", "POST", {"name": "Ana", "email": "ana@example.com", "password": "senha-segura"})
         self.assertEqual(status, 201)

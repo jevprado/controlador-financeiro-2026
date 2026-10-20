@@ -221,6 +221,23 @@ class Handler(BaseHTTPRequestHandler):
             with connect() as db:
                 db.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash(token),))
             return self.send_json(HTTPStatus.OK, {"ok": True}, self.cookie_header("", 0))
+        return self.save_expense(data, user)
+
+    def do_PUT(self):
+        if not self.mutation_allowed():
+            return self.send_json(HTTPStatus.FORBIDDEN, {"error": "Origem não permitida."})
+        match = re.fullmatch(r"/api/expenses/(\d+)", urlsplit(self.path).path)
+        if not match:
+            return self.send_json(HTTPStatus.NOT_FOUND, {"error": "Rota não encontrada."})
+        user = self.current_user()
+        if not user:
+            return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
+        data = self.read_json()
+        if data is None:
+            return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Envie um JSON válido."})
+        return self.save_expense(data, user, int(match.group(1)))
+
+    def save_expense(self, data, user, expense_id=None):
         description = str(data.get("description", "")).strip()
         kind = data.get("kind")
         account = str(data.get("account", "")).strip()
@@ -230,14 +247,23 @@ class Handler(BaseHTTPRequestHandler):
             valid_date = date.fromisoformat(due_date).isoformat() == due_date
         except (TypeError, ValueError):
             valid_date = False
-        if (not 2 <= len(description) <= 120 or kind not in KINDS or not 2 <= len(account) <= 80
+        if (not 2 <= len(description) <= 120 or not isinstance(kind, str) or kind not in KINDS or not 2 <= len(account) <= 80
                 or type(amount_cents) is not int or not 0 < amount_cents <= 1_000_000_000 or not valid_date):
             return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Confira os dados do lançamento."})
         with connect() as db:
-            cursor = db.execute("""
-                INSERT INTO expenses(user_id, description, kind, account, amount_cents, due_date, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (user["id"], description, kind, account, amount_cents, due_date, utc_now()))
+            if expense_id is not None:
+                result = db.execute("""
+                    UPDATE expenses SET description = ?, kind = ?, account = ?, amount_cents = ?, due_date = ?
+                    WHERE id = ? AND user_id = ?
+                """, (description, kind, account, amount_cents, due_date, expense_id, user["id"]))
+            else:
+                cursor = db.execute("""
+                    INSERT INTO expenses(user_id, description, kind, account, amount_cents, due_date, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (user["id"], description, kind, account, amount_cents, due_date, utc_now()))
+        if expense_id is not None:
+            return self.send_json(HTTPStatus.OK if result.rowcount else HTTPStatus.NOT_FOUND,
+                                  {"id": expense_id} if result.rowcount else {"error": "Lançamento não encontrado."})
         return self.send_json(HTTPStatus.CREATED, {"id": cursor.lastrowid})
 
     def do_DELETE(self):

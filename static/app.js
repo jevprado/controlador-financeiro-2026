@@ -7,6 +7,7 @@ let currentUser = null;
 let expenses = [];
 let accountNames = [];
 let activeAccountOption = -1;
+let editingExpenseId = null;
 
 async function api(path, options = {}) {
   let response;
@@ -120,7 +121,7 @@ function renderExpenses() {
     empty.append(makeElement('div', 'empty-icon', '✳'), makeElement('h3', '', 'Tudo em ordem por aqui'), makeElement('p', '', 'Adicione seu primeiro lançamento para começar a acompanhar este mês.'));
     const button = makeElement('button', 'secondary-button', '+ Adicionar lançamento');
     button.type = 'button';
-    button.addEventListener('click', openDialog);
+    button.addEventListener('click', () => openDialog());
     empty.append(button);
     list.append(empty);
     return;
@@ -133,6 +134,12 @@ function renderExpenses() {
     const value = makeElement('div', 'expense-value');
     const formattedDate = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', timeZone: 'UTC' }).format(new Date(`${item.due_date}T12:00:00Z`));
     value.append(makeElement('strong', '', money(item.amount_cents)), makeElement('span', '', formattedDate));
+    const actions = makeElement('div', 'expense-actions');
+    const edit = makeElement('button', 'edit-button', 'Editar');
+    edit.type = 'button';
+    edit.setAttribute('aria-label', `Editar ${item.description}`);
+    edit.title = 'Editar lançamento';
+    edit.addEventListener('click', () => openDialog(item));
     const remove = makeElement('button', 'remove-button', '×');
     remove.type = 'button';
     remove.setAttribute('aria-label', `Excluir ${item.description}`);
@@ -142,7 +149,8 @@ function renderExpenses() {
       try { await api(`/api/expenses/${item.id}`, { method: 'DELETE' }); await loadExpenses(); }
       catch (error) { alert(error.message); }
     });
-    row.append(icon, details, value, remove);
+    actions.append(edit, remove);
+    row.append(icon, details, value, actions);
     list.append(row);
   }
 }
@@ -239,16 +247,26 @@ $('.account-combobox').addEventListener('focusout', (event) => {
   if (!event.currentTarget.contains(event.relatedTarget)) closeAccountOptions();
 });
 
-function openDialog() {
+function openDialog(item = null) {
+  editingExpenseId = item ? item.id : null;
   $('#expense-form').reset();
   closeAccountOptions();
   $('#expense-error').textContent = '';
-  $('#due-date').value = today();
+  $('.dialog-head .eyebrow').textContent = item ? 'EDITAR COMPROMISSO' : 'NOVO COMPROMISSO';
+  $('.dialog-head h2').textContent = item ? 'Editar lançamento' : 'Adicionar lançamento';
+  $('#save-expense').textContent = item ? 'Salvar alterações' : 'Salvar lançamento →';
+  $('#due-date').value = item ? item.due_date : today();
+  if (item) {
+    $('#description').value = item.description;
+    $('#kind').value = item.kind;
+    $('#account').value = item.account;
+    $('#amount').value = (item.amount_cents / 100).toFixed(2);
+  }
   $('#expense-dialog').showModal();
   $('#description').focus();
   loadAccountNames();
 }
-$('#new-expense').addEventListener('click', openDialog);
+$('#new-expense').addEventListener('click', () => openDialog());
 $('#close-dialog').addEventListener('click', () => $('#expense-dialog').close());
 $('#expense-dialog').addEventListener('click', (event) => { if (event.target === $('#expense-dialog')) $('#expense-dialog').close(); });
 $('#expense-dialog').addEventListener('close', closeAccountOptions);
@@ -264,9 +282,12 @@ $('#expense-form').addEventListener('submit', async (event) => {
     return;
   }
   const button = $('#save-expense');
+  if (button.disabled) return;
   button.disabled = true;
   try {
-    await api('/api/expenses', { method: 'POST', body: JSON.stringify(body) });
+    await api(editingExpenseId === null ? '/api/expenses' : `/api/expenses/${editingExpenseId}`, {
+      method: editingExpenseId === null ? 'POST' : 'PUT', body: JSON.stringify(body),
+    });
     $('#expense-dialog').close();
     $('#month').value = body.due_date.slice(0, 7);
     await loadExpenses();
