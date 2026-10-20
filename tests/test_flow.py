@@ -54,12 +54,39 @@ class FinanceFlowTest(unittest.TestCase):
             with self.subTest(invalid=invalid):
                 self.assertEqual(self.call(path, "PUT", {**updated, **invalid}, owner)[0], 400)
         self.assertEqual(self.call(path, "PUT", None, owner)[0], 400)
-        self.assertEqual(self.call("/api/expenses?month=2026-10", cookie=owner)[1]["expenses"], [{"id": created["id"], **original}])
+        self.assertEqual(self.call("/api/expenses?month=2026-10", cookie=owner)[1]["expenses"], [{"id": created["id"], **original, "is_paid": False}])
         self.assertEqual(self.call(path, "PUT", updated, owner)[0], 200)
         self.assertEqual(self.call("/api/expenses?month=2026-10", cookie=owner)[1]["expenses"], [])
-        self.assertEqual(self.call("/api/expenses?month=2026-11", cookie=owner)[1]["expenses"], [{"id": created["id"], **updated}])
+        self.assertEqual(self.call("/api/expenses?month=2026-11", cookie=owner)[1]["expenses"], [{"id": created["id"], **updated, "is_paid": False}])
         self.assertEqual(self.call("/api/accounts", cookie=owner)[1]["accounts"], ["Banco D"])
         self.assertEqual(self.call(path, "DELETE", cookie=owner)[0], 200)
+
+    def test_payment_is_persisted_reversible_and_isolated(self):
+        _, _, owner = self.call("/api/register", "POST", {"name": "Gabi", "email": "gabi@example.com", "password": "senha-segura"})
+        _, _, other = self.call("/api/register", "POST", {"name": "Hugo", "email": "hugo@example.com", "password": "senha-segura"})
+        expense = {"description": "Fatura", "kind": "Cartão de crédito", "account": "Cartão G", "amount_cents": 10000, "due_date": "2026-10-15"}
+        _, created, _ = self.call("/api/expenses", "POST", expense, owner)
+        path = f"/api/expenses/{created['id']}"
+
+        def listed_expense():
+            return self.call("/api/expenses?month=2026-10", cookie=owner)[1]["expenses"][0]
+
+        self.assertIs(listed_expense()["is_paid"], False)
+        self.assertEqual(self.call(path + "/payment", "PUT", {"is_paid": True})[0], 401)
+        self.assertEqual(self.call(path + "/payment", "PUT", {"is_paid": True}, other)[0], 404)
+        self.assertEqual(self.call("/api/expenses/999999/payment", "PUT", {"is_paid": True}, owner)[0], 404)
+        for invalid in (None, {}, {"is_paid": 1}, {"is_paid": "false"}, {"is_paid": None}):
+            with self.subTest(invalid=invalid):
+                self.assertEqual(self.call(path + "/payment", "PUT", invalid, owner)[0], 400)
+        self.assertIs(listed_expense()["is_paid"], False)
+        self.assertEqual(self.call(path + "/payment", "PUT", {"is_paid": True}, owner)[:2], (200, {"is_paid": True}))
+        server.init_db()
+        self.assertIs(listed_expense()["is_paid"], True)
+        updated = {**expense, "description": "Fatura revisada"}
+        self.assertEqual(self.call(path, "PUT", updated, owner)[0], 200)
+        self.assertEqual(listed_expense(), {"id": created["id"], **updated, "is_paid": True})
+        self.assertEqual(self.call(path + "/payment", "PUT", {"is_paid": False}, owner)[0], 200)
+        self.assertIs(listed_expense()["is_paid"], False)
 
     def test_monthly_order_is_persisted_and_isolated(self):
         _, _, owner = self.call("/api/register", "POST", {"name": "Eva", "email": "eva@example.com", "password": "senha-segura"})

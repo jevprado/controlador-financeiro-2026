@@ -148,6 +148,32 @@ function renderExpenses() {
     const formattedDate = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', timeZone: 'UTC' }).format(new Date(`${item.due_date}T12:00:00Z`));
     value.append(makeElement('strong', '', money(item.amount_cents)), makeElement('span', '', formattedDate));
     const actions = makeElement('div', 'expense-actions');
+    const payment = makeElement('label', 'payment-selector');
+    const paid = makeElement('input');
+    paid.type = 'checkbox';
+    paid.checked = item.is_paid;
+    paid.setAttribute('aria-label', `Pago: ${item.account} · ${item.description}`);
+    const paymentText = makeElement('span', '', item.is_paid ? 'Pago' : 'Pendente');
+    payment.classList.toggle('is-paid', item.is_paid);
+    payment.append(paid, paymentText);
+    paid.addEventListener('change', async () => {
+      const isPaid = paid.checked;
+      paid.disabled = true;
+      try {
+        const data = await api(`/api/expenses/${item.id}/payment`, {
+          method: 'PUT', body: JSON.stringify({ is_paid: isPaid }),
+        });
+        item.is_paid = data.is_paid;
+        paid.checked = item.is_paid;
+        paymentText.textContent = item.is_paid ? 'Pago' : 'Pendente';
+        payment.classList.toggle('is-paid', item.is_paid);
+      } catch (error) {
+        paid.checked = item.is_paid;
+        alert(error.message);
+      } finally {
+        paid.disabled = false;
+      }
+    });
     const edit = makeElement('button', 'edit-button', 'Editar');
     edit.type = 'button';
     edit.setAttribute('aria-label', `Editar ${item.description}`);
@@ -162,7 +188,7 @@ function renderExpenses() {
       try { await api(`/api/expenses/${item.id}`, { method: 'DELETE' }); await loadExpenses(); }
       catch (error) { alert(error.message); }
     });
-    actions.append(edit, remove);
+    actions.append(payment, edit, remove);
     row.append(handle, icon, details, value, actions);
     list.append(row);
   }

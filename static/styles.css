@@ -10,6 +10,11 @@
 .order-status{font-size:12px;color:#5a6b5b;margin:0 0 10px}
 .order-status:empty{display:none}
 .expense-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.payment-selector{display:flex;align-items:center;gap:6px;min-height:32px;color:#68786b;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.payment-selector input{width:16px;height:16px;margin:0;accent-color:#376543;cursor:pointer}
+.payment-selector input:disabled{cursor:wait}
+.payment-selector input:focus-visible{outline:2px solid #376543;outline-offset:2px}
+.payment-selector.is-paid{color:#376543}
 .expense-actions .remove-button{margin-left:0;min-width:28px;min-height:32px}
 .edit-button{border:1px solid #c6dcbf;border-radius:7px;background:#f1f8ec;color:#376543;padding:7px 8px;font-size:11px;font-weight:700}
 .edit-button:hover{background:#e3efda}

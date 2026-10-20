@@ -62,6 +62,8 @@ def init_db():
         """)
         if "sort_order" not in {row["name"] for row in db.execute("PRAGMA table_info(expenses)")}:
             db.execute("ALTER TABLE expenses ADD COLUMN sort_order INTEGER")
+        if "is_paid" not in {row["name"] for row in db.execute("PRAGMA table_info(expenses)")}:
+            db.execute("ALTER TABLE expenses ADD COLUMN is_paid INTEGER NOT NULL DEFAULT 0 CHECK(is_paid IN (0, 1))")
 
 
 def utc_now():
@@ -163,11 +165,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Mês inválido."})
             with connect() as db:
                 rows = db.execute("""
-                    SELECT id, description, kind, account, amount_cents, due_date
+                    SELECT id, description, kind, account, amount_cents, due_date, is_paid
                     FROM expenses WHERE user_id = ? AND substr(due_date, 1, 7) = ?
                     ORDER BY sort_order IS NULL, sort_order, due_date DESC, id DESC
                 """, (user["id"], month)).fetchall()
-            return self.send_json(HTTPStatus.OK, {"expenses": [dict(row) for row in rows]})
+            return self.send_json(HTTPStatus.OK, {"expenses": [{**dict(row), "is_paid": bool(row["is_paid"])} for row in rows]})
         files = {"/": ("index.html", "text/html; charset=utf-8"),
                  "/styles.css": ("styles.css", "text/css; charset=utf-8"),
                  "/app.js": ("app.js", "text/javascript; charset=utf-8")}
@@ -230,6 +232,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(HTTPStatus.FORBIDDEN, {"error": "Origem não permitida."})
         if urlsplit(self.path).path == "/api/expenses/order":
             return self.save_expense_order()
+        payment_match = re.fullmatch(r"/api/expenses/(\d+)/payment", urlsplit(self.path).path)
+        if payment_match:
+            return self.save_expense_payment(int(payment_match.group(1)))
         match = re.fullmatch(r"/api/expenses/(\d+)", urlsplit(self.path).path)
         if not match:
             return self.send_json(HTTPStatus.NOT_FOUND, {"error": "Rota não encontrada."})
@@ -240,6 +245,19 @@ class Handler(BaseHTTPRequestHandler):
         if data is None:
             return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Envie um JSON válido."})
         return self.save_expense(data, user, int(match.group(1)))
+
+    def save_expense_payment(self, expense_id):
+        user = self.current_user()
+        if not user:
+            return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
+        data = self.read_json()
+        if data is None or type(data.get("is_paid")) is not bool:
+            return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Informe um estado de pagamento válido."})
+        with connect() as db:
+            result = db.execute("UPDATE expenses SET is_paid = ? WHERE id = ? AND user_id = ?",
+                                (data["is_paid"], expense_id, user["id"]))
+        return self.send_json(HTTPStatus.OK if result.rowcount else HTTPStatus.NOT_FOUND,
+                              {"is_paid": data["is_paid"]} if result.rowcount else {"error": "Lançamento não encontrado."})
 
     def save_expense_order(self):
         user = self.current_user()
