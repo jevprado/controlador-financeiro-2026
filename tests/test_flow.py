@@ -61,6 +61,40 @@ class FinanceFlowTest(unittest.TestCase):
         self.assertEqual(self.call("/api/accounts", cookie=owner)[1]["accounts"], ["Banco D"])
         self.assertEqual(self.call(path, "DELETE", cookie=owner)[0], 200)
 
+    def test_monthly_order_is_persisted_and_isolated(self):
+        _, _, owner = self.call("/api/register", "POST", {"name": "Eva", "email": "eva@example.com", "password": "senha-segura"})
+        _, _, other = self.call("/api/register", "POST", {"name": "Fabio", "email": "fabio@example.com", "password": "senha-segura"})
+        expense = {"description": "Fatura", "kind": "Cartão de crédito", "account": "Cartão E", "amount_cents": 10000, "due_date": "2026-10-15"}
+        ids = [self.call("/api/expenses", "POST", expense, owner)[1]["id"] for _ in range(3)]
+        november_id = self.call("/api/expenses", "POST", {**expense, "due_date": "2026-11-15"}, owner)[1]["id"]
+        other_id = self.call("/api/expenses", "POST", expense, other)[1]["id"]
+        order = [ids[1], ids[0], ids[2]]
+        payload = {"month": "2026-10", "ids": order}
+        path = "/api/expenses/order"
+        self.assertEqual(self.call(path, "PUT", payload)[0], 401)
+        self.assertEqual(self.call(path, "PUT", payload, other)[0], 409)
+        for invalid, status in (({"ids": [ids[0]]}, 409), ({"ids": [ids[0], ids[0], ids[2]]}, 400),
+                                ({"ids": [ids[0], ids[1], other_id]}, 409),
+                                ({"ids": [ids[0], ids[1], november_id]}, 409),
+                                ({"ids": [True]}, 400), ({"month": "2026-13"}, 400)):
+            with self.subTest(invalid=invalid):
+                self.assertEqual(self.call(path, "PUT", {**payload, **invalid}, owner)[0], status)
+        self.assertEqual(self.call(path, "PUT", payload, owner)[0], 200)
+        def listed_ids(month="2026-10"):
+            return [item["id"] for item in self.call(f"/api/expenses?month={month}", cookie=owner)[1]["expenses"]]
+        self.assertEqual(listed_ids(), order)
+        server.init_db()  # Startup migration is safe to repeat and preserves the saved order.
+        self.assertEqual(listed_ids(), order)
+        self.assertEqual(listed_ids("2026-11"), [november_id])
+        self.assertEqual(self.call(f"/api/expenses/{ids[1]}", "PUT", {**expense, "due_date": "2026-10-25"}, owner)[0], 200)
+        self.assertEqual(listed_ids(), order)
+        new_id = self.call("/api/expenses", "POST", expense, owner)[1]["id"]
+        self.assertEqual(listed_ids(), order + [new_id])
+        self.assertEqual(self.call(f"/api/expenses/{ids[0]}", "PUT", {**expense, "due_date": "2026-11-20"}, owner)[0], 200)
+        self.assertEqual(listed_ids(), [ids[1], ids[2], new_id])
+        self.assertEqual(self.call(f"/api/expenses/{ids[2]}", "DELETE", cookie=owner)[0], 200)
+        self.assertEqual(listed_ids(), [ids[1], new_id])
+
     def test_accounts_are_isolated(self):
         status, _, first = self.call("/api/register", "POST", {"name": "Ana", "email": "ana@example.com", "password": "senha-segura"})
         self.assertEqual(status, 201)

@@ -8,6 +8,12 @@ let expenses = [];
 let accountNames = [];
 let activeAccountOption = -1;
 let editingExpenseId = null;
+let savingOrder = false;
+let expenseRequest = 0;
+const orderStatus = makeElement('p', 'order-status');
+orderStatus.setAttribute('role', 'status');
+orderStatus.setAttribute('aria-live', 'polite');
+$('#expense-list').before(orderStatus);
 
 async function api(path, options = {}) {
   let response;
@@ -128,9 +134,16 @@ function renderExpenses() {
   }
   for (const item of expenses) {
     const row = makeElement('div', 'expense-row');
+    row.dataset.id = item.id;
+    const handle = makeElement('button', 'drag-handle', '⠿');
+    handle.type = 'button';
+    handle.setAttribute('aria-label', `Mover ${item.account}. Use as setas para cima ou para baixo para reordenar.`);
+    handle.title = 'Arraste para reordenar ou use as setas ↑ e ↓';
+    handle.disabled = expenses.length < 2;
+    enableExpenseDrag(handle, row);
     const icon = makeElement('div', 'expense-icon', item.kind === 'Cartão de crédito' ? '▤' : item.kind === 'Empréstimo' ? '◇' : '◎');
     const details = makeElement('div', 'expense-details');
-    details.append(makeElement('strong', '', item.description), makeElement('span', '', `${item.kind} · ${item.account}`));
+    details.append(makeElement('strong', '', item.account), makeElement('span', '', `${item.kind} · ${item.description}`));
     const value = makeElement('div', 'expense-value');
     const formattedDate = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', timeZone: 'UTC' }).format(new Date(`${item.due_date}T12:00:00Z`));
     value.append(makeElement('strong', '', money(item.amount_cents)), makeElement('span', '', formattedDate));
@@ -150,14 +163,100 @@ function renderExpenses() {
       catch (error) { alert(error.message); }
     });
     actions.append(edit, remove);
-    row.append(icon, details, value, actions);
+    row.append(handle, icon, details, value, actions);
     list.append(row);
   }
 }
 
-async function loadExpenses() {
+async function saveExpenseOrder(focusId) {
+  const ids = [...$('#expense-list').children].map((row) => Number(row.dataset.id));
+  if (ids.every((id, index) => id === expenses[index].id)) return;
+  savingOrder = true;
+  $('#expense-list').inert = true;
+  $('#month').disabled = true;
+  $('#new-expense').disabled = true;
+  orderStatus.textContent = 'Salvando ordem…';
   try {
-    expenses = (await api(`/api/expenses?month=${encodeURIComponent($('#month').value)}`)).expenses;
+    await api('/api/expenses/order', { method: 'PUT', body: JSON.stringify({ month: $('#month').value, ids }) });
+    const byId = new Map(expenses.map((item) => [item.id, item]));
+    expenses = ids.map((id) => byId.get(id));
+    orderStatus.textContent = 'Ordem salva.';
+  } catch (error) {
+    await loadExpenses();
+    orderStatus.textContent = `Não foi possível salvar a ordem. ${error.message}`;
+  } finally {
+    savingOrder = false;
+    $('#expense-list').inert = false;
+    $('#month').disabled = false;
+    $('#new-expense').disabled = false;
+    $(`.expense-row[data-id="${focusId}"] .drag-handle`)?.focus({ preventScroll: true });
+  }
+}
+
+function enableExpenseDrag(handle, row) {
+  const list = $('#expense-list');
+  let pointerId = null;
+  let startY = 0;
+  let dragging = false;
+  handle.addEventListener('pointerdown', (event) => {
+    if (savingOrder || !event.isPrimary || event.button !== 0 || handle.disabled) return;
+    pointerId = event.pointerId;
+    startY = event.clientY;
+    list.addEventListener('pointermove', move);
+    list.addEventListener('pointerup', finish);
+    list.addEventListener('pointercancel', finish);
+    list.addEventListener('lostpointercapture', finish);
+    list.setPointerCapture(pointerId);
+  });
+  const move = (event) => {
+    if (pointerId !== event.pointerId) return;
+    if (!dragging && Math.abs(event.clientY - startY) < 5) return;
+    dragging = true;
+    row.classList.add('dragging');
+    const otherRows = [...$('#expense-list').children].filter((item) => item !== row);
+    const before = otherRows.find((item) => {
+      const rect = item.getBoundingClientRect();
+      return event.clientY < rect.top + rect.height / 2;
+    });
+    $('#expense-list').insertBefore(row, before || null);
+    if (event.clientY < 70) window.scrollBy(0, -18);
+    else if (event.clientY > window.innerHeight - 70) window.scrollBy(0, 18);
+  };
+  const finish = (event) => {
+    if (pointerId !== event.pointerId) return;
+    const moved = dragging;
+    pointerId = null;
+    dragging = false;
+    row.classList.remove('dragging');
+    list.removeEventListener('pointermove', move);
+    list.removeEventListener('pointerup', finish);
+    list.removeEventListener('pointercancel', finish);
+    list.removeEventListener('lostpointercapture', finish);
+    if (list.hasPointerCapture(event.pointerId)) list.releasePointerCapture(event.pointerId);
+    if (event.type !== 'pointerup') {
+      if (moved) renderExpenses();
+      return;
+    }
+    if (moved) saveExpenseOrder(row.dataset.id);
+  };
+  handle.addEventListener('keydown', (event) => {
+    if (savingOrder || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'ArrowUp' && row.previousElementSibling) row.previousElementSibling.before(row);
+    else if (event.key === 'ArrowDown' && row.nextElementSibling) row.nextElementSibling.after(row);
+    else return;
+    saveExpenseOrder(row.dataset.id);
+  });
+}
+
+async function loadExpenses() {
+  const request = ++expenseRequest;
+  const month = $('#month').value;
+  orderStatus.textContent = '';
+  try {
+    const data = await api(`/api/expenses?month=${encodeURIComponent(month)}`);
+    if (request !== expenseRequest) return;
+    expenses = data.expenses;
     renderExpenses();
   } catch (error) {
     if (error.message === 'Faça login para continuar.') showAuth();
@@ -165,6 +264,12 @@ async function loadExpenses() {
   }
 }
 $('#month').addEventListener('change', loadExpenses);
+$('.month-bar').addEventListener('click', () => {
+  const monthInput = $('#month');
+  if (monthInput.disabled) return;
+  monthInput.focus();
+  if (typeof monthInput.showPicker === 'function') monthInput.showPicker();
+});
 
 function closeAccountOptions() {
   $('#account-options').classList.add('hidden');

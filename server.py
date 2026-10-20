@@ -60,6 +60,8 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS expenses_user_date ON expenses(user_id, due_date);
         """)
+        if "sort_order" not in {row["name"] for row in db.execute("PRAGMA table_info(expenses)")}:
+            db.execute("ALTER TABLE expenses ADD COLUMN sort_order INTEGER")
 
 
 def utc_now():
@@ -163,7 +165,7 @@ class Handler(BaseHTTPRequestHandler):
                 rows = db.execute("""
                     SELECT id, description, kind, account, amount_cents, due_date
                     FROM expenses WHERE user_id = ? AND substr(due_date, 1, 7) = ?
-                    ORDER BY due_date DESC, id DESC
+                    ORDER BY sort_order IS NULL, sort_order, due_date DESC, id DESC
                 """, (user["id"], month)).fetchall()
             return self.send_json(HTTPStatus.OK, {"expenses": [dict(row) for row in rows]})
         files = {"/": ("index.html", "text/html; charset=utf-8"),
@@ -226,6 +228,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_PUT(self):
         if not self.mutation_allowed():
             return self.send_json(HTTPStatus.FORBIDDEN, {"error": "Origem não permitida."})
+        if urlsplit(self.path).path == "/api/expenses/order":
+            return self.save_expense_order()
         match = re.fullmatch(r"/api/expenses/(\d+)", urlsplit(self.path).path)
         if not match:
             return self.send_json(HTTPStatus.NOT_FOUND, {"error": "Rota não encontrada."})
@@ -236,6 +240,29 @@ class Handler(BaseHTTPRequestHandler):
         if data is None:
             return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Envie um JSON válido."})
         return self.save_expense(data, user, int(match.group(1)))
+
+    def save_expense_order(self):
+        user = self.current_user()
+        if not user:
+            return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
+        data = self.read_json()
+        if data is None:
+            return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Envie um JSON válido."})
+        month, ids = data.get("month"), data.get("ids")
+        if (not isinstance(month, str) or not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month)
+                or not isinstance(ids, list) or any(type(item) is not int for item in ids)
+                or len(ids) != len(set(ids))):
+            return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ordem de lançamentos inválida."})
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            existing = {row["id"] for row in db.execute(
+                "SELECT id FROM expenses WHERE user_id = ? AND substr(due_date, 1, 7) = ?",
+                (user["id"], month))}
+            if existing != set(ids):
+                return self.send_json(HTTPStatus.CONFLICT, {"error": "A lista mudou. Atualize os lançamentos e tente novamente."})
+            db.executemany("UPDATE expenses SET sort_order = ? WHERE id = ? AND user_id = ?",
+                           [(position, expense_id, user["id"]) for position, expense_id in enumerate(ids)])
+        return self.send_json(HTTPStatus.OK, {"ok": True})
 
     def save_expense(self, data, user, expense_id=None):
         description = str(data.get("description", "")).strip()
@@ -253,9 +280,11 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as db:
             if expense_id is not None:
                 result = db.execute("""
-                    UPDATE expenses SET description = ?, kind = ?, account = ?, amount_cents = ?, due_date = ?
+                    UPDATE expenses SET description = ?, kind = ?, account = ?, amount_cents = ?,
+                        sort_order = CASE WHEN substr(due_date, 1, 7) = substr(?, 1, 7) THEN sort_order ELSE NULL END,
+                        due_date = ?
                     WHERE id = ? AND user_id = ?
-                """, (description, kind, account, amount_cents, due_date, expense_id, user["id"]))
+                """, (description, kind, account, amount_cents, due_date, due_date, expense_id, user["id"]))
             else:
                 cursor = db.execute("""
                     INSERT INTO expenses(user_id, description, kind, account, amount_cents, due_date, created_at)
