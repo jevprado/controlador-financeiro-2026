@@ -109,15 +109,21 @@ function makeElement(tag, className, content) {
   return element;
 }
 
-function renderExpenses() {
+function renderSummary() {
   const total = expenses.reduce((sum, item) => sum + item.amount_cents, 0);
   const cards = expenses.filter((item) => item.kind === 'Cartão de crédito');
   const cardsTotal = cards.reduce((sum, item) => sum + item.amount_cents, 0);
+  const pending = expenses.filter((item) => !item.is_paid);
+  const pendingTotal = pending.reduce((sum, item) => sum + item.amount_cents, 0);
   $('#total-amount').textContent = money(total);
   $('#cards-amount').textContent = money(cardsTotal);
-  $('#other-amount').textContent = money(total - cardsTotal);
+  $('#pending-amount').textContent = money(pendingTotal);
   $('#cards-count').textContent = `${cards.length} ${cards.length === 1 ? 'lançamento' : 'lançamentos'}`;
-  $('#other-count').textContent = `${expenses.length - cards.length} ${expenses.length - cards.length === 1 ? 'lançamento' : 'lançamentos'}`;
+  $('#pending-count').textContent = `${pending.length} ${pending.length === 1 ? 'lançamento pendente' : 'lançamentos pendentes'}`;
+}
+
+function renderExpenses() {
+  renderSummary();
   $('#expense-count').textContent = `${expenses.length} ${expenses.length === 1 ? 'lançamento' : 'lançamentos'}`;
   $('#month-label').textContent = monthName($('#month').value);
   const list = $('#expense-list');
@@ -167,6 +173,7 @@ function renderExpenses() {
         paid.checked = item.is_paid;
         paymentText.textContent = item.is_paid ? 'Pago' : 'Pendente';
         payment.classList.toggle('is-paid', item.is_paid);
+        renderSummary();
       } catch (error) {
         paid.checked = item.is_paid;
         alert(error.message);
