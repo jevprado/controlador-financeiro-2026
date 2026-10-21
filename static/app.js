@@ -109,6 +109,31 @@ function makeElement(tag, className, content) {
   return element;
 }
 
+function makeExpenseIcon(kind) {
+  const paths = {
+    'Cartão de crédito': 'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z M2 9h20 M6 15h3 M13 15h2',
+    'Cheque especial': 'M13 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-7 M6 9h3 M6 15h5 M15 15l2-5 4-4a1.4 1.4 0 0 0-2-2l-4 4-2 5Z',
+    'Empréstimo': 'M3 9h18L12 3 3 9Z M5 9v9 M10 9v9 M14 9v9 M19 9v9 M3 18h18 M2 21h20',
+    'Outros': 'M5 3l2 2 2-2 3 2 3-2 2 2 2-2v18l-2-2-2 2-3-2-3 2-2-2-2 2V3Z M9 9h6 M9 13h6 M9 17h3',
+  };
+  const icon = makeElement('div', 'expense-icon');
+  icon.title = kind;
+  icon.setAttribute('aria-hidden', 'true');
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.7');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', paths[kind] || paths.Outros);
+  svg.append(path);
+  icon.append(svg);
+  return icon;
+}
+
 function renderSummary() {
   const total = expenses.reduce((sum, item) => sum + item.amount_cents, 0);
   const cards = expenses.filter((item) => item.kind === 'Cartão de crédito');
@@ -147,7 +172,7 @@ function renderExpenses() {
     handle.title = 'Arraste para reordenar ou use as setas ↑ e ↓';
     handle.disabled = expenses.length < 2;
     enableExpenseDrag(handle, row);
-    const icon = makeElement('div', 'expense-icon', item.kind === 'Cartão de crédito' ? '▤' : item.kind === 'Empréstimo' ? '◇' : '◎');
+    const icon = makeExpenseIcon(item.kind);
     const details = makeElement('div', 'expense-details');
     details.append(makeElement('strong', '', item.account), makeElement('span', '', `${item.kind} · ${item.description}`));
     const value = makeElement('div', 'expense-value');
