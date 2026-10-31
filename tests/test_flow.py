@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -6,15 +7,23 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from unittest.mock import patch
 
 import server
 from database_test_support import isolated_database
+
+
+TEST_INVITE_CODE = "convite-exclusivo-para-testes-1234567890"
 
 
 class FinanceFlowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.enterClassContext(isolated_database())
+        cls.enterClassContext(patch.dict(os.environ, {
+            "ALLOWED_EMAILS": ",".join(f"{name}@example.com" for name in ("ana", "bia", "caio", "dani", "eva", "fabio", "gabi", "hugo", "iara", "joana", "kaio")),
+            "REGISTRATION_INVITE_CODE": TEST_INVITE_CODE,
+        }))
         cls.temp = tempfile.TemporaryDirectory()
         server.DB_PATH = Path(cls.temp.name) / "finance.db"
         server.init_db()
@@ -30,6 +39,8 @@ class FinanceFlowTest(unittest.TestCase):
         cls.temp.cleanup()
 
     def call(self, path, method="GET", data=None, cookie=None):
+        if path == "/api/register" and isinstance(data, dict):
+            data = {"invite_code": TEST_INVITE_CODE, **data}
         headers = {"Content-Type": "application/json"}
         if cookie:
             headers["Cookie"] = cookie
@@ -41,6 +52,63 @@ class FinanceFlowTest(unittest.TestCase):
             response = error
         with response:
             return response.status, json.load(response), response.headers.get("Set-Cookie", "").split(";", 1)[0]
+
+    def test_registration_requires_allowed_email_and_invite(self):
+        user = {"name": "Joana", "email": "joana@example.com", "password": "senha-segura"}
+        for change in ({"email": "visitante@example.com"}, {"email": "ana@example.com.evil.test"},
+                       {"invite_code": None}, {"invite_code": ""}, {"invite_code": "incorreto"},
+                       {"invite_code": [TEST_INVITE_CODE]}, {"invite_code": "á" * 32}):
+            with self.subTest(change=change):
+                status, _, cookie = self.call("/api/register", "POST", {**user, **change})
+                self.assertEqual(status, 403)
+                self.assertFalse(cookie)
+        with server.connect() as db:
+            self.assertIsNone(db.execute("SELECT id FROM users WHERE email = ?", (user["email"],)).fetchone())
+        with patch.dict(os.environ, {"ALLOWED_EMAILS": " JOANA@EXAMPLE.COM , kaio@example.com "}):
+            status, result, cookie = self.call("/api/register", "POST", {**user, "email": " Joana@Example.com "})
+            self.assertEqual(status, 201)
+            self.assertEqual(result["user"]["email"], user["email"])
+            self.assertEqual(self.call("/api/me", cookie=cookie)[0], 200)
+
+    def test_missing_or_invalid_access_configuration_denies_access(self):
+        user = {"name": "Kaio", "email": "kaio@example.com", "password": "senha-segura"}
+        for value in (None, "", "*", "kaio@example.com,invalid", "kaio@example.com,"):
+            with self.subTest(value=value), patch.dict(os.environ):
+                if value is None:
+                    os.environ.pop("ALLOWED_EMAILS", None)
+                else:
+                    os.environ["ALLOWED_EMAILS"] = value
+                self.assertEqual(self.call("/api/register", "POST", user)[0], 403)
+                self.assertEqual(self.call("/api/login", "POST", user)[0], 401)
+        for value in (None, "", "curto", "x" * 257):
+            with self.subTest(invite=value), patch.dict(os.environ):
+                if value is None:
+                    os.environ.pop("REGISTRATION_INVITE_CODE", None)
+                else:
+                    os.environ["REGISTRATION_INVITE_CODE"] = value
+                self.assertEqual(self.call("/api/register", "POST", user)[0], 403)
+
+    def test_removing_email_blocks_login_and_existing_sessions(self):
+        user = {"name": "Kaio", "email": "kaio@example.com", "password": "senha-segura"}
+        _, _, cookie = self.call("/api/register", "POST", user)
+        with patch.dict(os.environ, {"REGISTRATION_INVITE_CODE": ""}):
+            # Closing registration must not lock existing authorized users out.
+            self.assertEqual(self.call("/api/login", "POST", user)[0], 200)
+            self.assertEqual(self.call("/api/me", cookie=cookie)[0], 200)
+        with patch.dict(os.environ, {"ALLOWED_EMAILS": "ana@example.com"}):
+            self.assertEqual(self.call("/api/login", "POST", user)[0], 401)
+            self.assertEqual(self.call("/api/me", cookie=cookie)[0], 401)
+            self.assertEqual(self.call("/api/accounts", cookie=cookie)[0], 401)
+            self.assertEqual(self.call("/api/expenses?month=2026-10", cookie=cookie)[0], 401)
+            expense = {"description": "Fatura", "kind": "Outros", "account": "Cartão", "amount_cents": 100, "due_date": "2026-10-01"}
+            self.assertEqual(self.call("/api/expenses", "POST", expense, cookie)[0], 401)
+            self.assertEqual(self.call("/api/expenses/1", "PUT", expense, cookie)[0], 401)
+            self.assertEqual(self.call("/api/expenses/1", "DELETE", cookie=cookie)[0], 401)
+            self.assertEqual(self.call("/api/expenses/1/payment", "PUT", {"is_paid": True}, cookie)[0], 401)
+            self.assertEqual(self.call("/api/expenses/order", "PUT", {"month": "2026-10", "ids": []}, cookie)[0], 401)
+        # A session rejected while the email was removed remains invalid.
+        self.assertEqual(self.call("/api/me", cookie=cookie)[0], 401)
+        self.assertEqual(self.call("/api/login", "POST", user)[0], 200)
 
     def test_duplicate_registration_preserves_original_login(self):
         original = {"name": "Iara", "email": "iara@example.com", "password": "senha-original"}

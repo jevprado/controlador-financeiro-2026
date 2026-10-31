@@ -6,7 +6,7 @@ O servidor utiliza Python, com SQLite para uso local ou PostgreSQL externo quand
 
 ## Funcionalidades
 
-- Cadastro, login e encerramento de sessão.
+- Cadastro por convite para e-mails autorizados, login e encerramento de sessão.
 - Seleção do mês para consultar os lançamentos e o resumo financeiro.
 - Criação, edição e exclusão de lançamentos com descrição, tipo, conta ou cartão, valor e data.
 - Tipos disponíveis: cartão de crédito, cheque especial, empréstimo e outros.
@@ -27,7 +27,7 @@ O card de pendências também exibe a quantidade de lançamentos pendentes. Ao m
 
 ## Executar
 
-É necessário ter Python 3.11 ou superior com suporte a SQLite 3.35 ou superior e um navegador atualizado. Na pasta do projeto, execute:
+É necessário ter Python 3.11 ou superior com suporte a SQLite 3.35 ou superior e um navegador atualizado. Antes de iniciar, configure `ALLOWED_EMAILS` e o convite conforme a seção **Acesso restrito a duas pessoas**. Na pasta do projeto, execute:
 
 ```bash
 python3 server.py
@@ -44,6 +44,8 @@ Configuração por variáveis de ambiente:
 | `PORT` | `8000` | Porta do servidor local. |
 | `FINANCE_DB` | `data/finance.db` na pasta do projeto | Caminho do arquivo SQLite. |
 | `DATABASE_URL` | Não definida | URL PostgreSQL. Quando definida, substitui completamente o SQLite. Obrigatória na Vercel. |
+| `ALLOWED_EMAILS` | Não definida: acesso bloqueado | E-mails que podem cadastrar, entrar e usar sessões, separados por vírgula. |
+| `REGISTRATION_INVITE_CODE` | Não definida: cadastro fechado | Código privado de 32 a 256 caracteres, exigido apenas no cadastro. |
 
 Exemplo com outra porta:
 
@@ -56,6 +58,37 @@ Exemplo com outro arquivo de dados:
 ```bash
 FINANCE_DB=/tmp/clara-demo.db python3 server.py
 ```
+
+### Acesso restrito a duas pessoas
+
+A autorização é aplicada no backend, inclusive para chamadas diretas à API. Configure os dois e-mails reais no ambiente privado do servidor:
+
+```bash
+export ALLOWED_EMAILS='seu-email@exemplo.com,email-da-outra-pessoa@exemplo.com'
+```
+
+Os e-mails são comparados por endereço completo, ignorando maiúsculas e espaços externos. Domínios e curingas não são aceitos como regras de acesso. Uma lista ausente, vazia ou com qualquer entrada inválida bloqueia cadastro, login e uso das sessões, tanto localmente quanto na Vercel.
+
+Para permitir os primeiros cadastros, gere um código privado:
+
+```bash
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+Cadastre o valor gerado em `REGISTRATION_INVITE_CODE`. Para digitá-lo sem salvá-lo no histórico do Bash:
+
+```bash
+read -rsp 'Código de convite: ' REGISTRATION_INVITE_CODE
+export REGISTRATION_INVITE_CODE
+```
+
+Compartilhe o código somente com a outra pessoa. Na tela **Criar conta**, cada pessoa informa seu e-mail autorizado, sua própria senha e o código. Um visitante que conhece apenas o e-mail não consegue cadastrar a conta sem o convite. O código não fica no JavaScript nem é retornado pela API. O convite autoriza o cadastro; não há confirmação de propriedade do e-mail por mensagem.
+
+O convite é compartilhado e reutilizável enquanto estiver configurado, mas a unicidade do e-mail impede criar uma segunda conta para o mesmo endereço. Depois que os dois cadastros forem feitos, remova `REGISTRATION_INVITE_CODE` para fechar novos cadastros. Contas autorizadas existentes continuam entrando normalmente com e-mail e senha, sem convite.
+
+Para retirar o acesso de uma pessoa, remova seu e-mail de `ALLOWED_EMAILS`. Contas já existentes também obedecem à lista: o login é recusado e todas as rotas protegidas rejeitam suas sessões. Uma sessão apresentada após a remoção tem seu token excluído do banco; sessões ainda não apresentadas ficam bloqueadas enquanto o e-mail estiver fora da lista. Os cadastros e lançamentos são preservados.
+
+Na Vercel, configure essas duas variáveis no ambiente privado do projeto, junto com `DATABASE_URL`, e aplique a alteração em um novo deployment. Localmente, reinicie o servidor após alterar as variáveis no terminal. O arquivo `.env.example` é apenas um modelo e não é carregado automaticamente.
 
 ### PostgreSQL externo e configuração na Vercel
 
@@ -148,7 +181,7 @@ Execute os testes de integração na pasta do projeto:
 python3 -m unittest discover -s tests -v
 ```
 
-Por padrão, os testes utilizam SQLite temporário e um servidor HTTP local em uma porta livre. Eles ignoram `DATABASE_URL` do ambiente para não acessar o banco da aplicação. Cobrem autenticação e isolamento entre usuários, edição de lançamentos, ordenação mensal e marcação reversível e persistente de pagamentos, além da configuração de banco e da migração do esquema SQLite.
+Por padrão, os testes utilizam SQLite temporário e um servidor HTTP local em uma porta livre. Eles ignoram `DATABASE_URL` do ambiente para não acessar o banco da aplicação e configuram sua própria lista de e-mails e convite fictícios. Cobrem cadastro restrito, configuração ausente ou inválida, bloqueio de contas e sessões removidas da lista, autenticação e isolamento entre usuários, edição de lançamentos, ordenação mensal e marcação reversível e persistente de pagamentos, além da configuração de banco e da migração do esquema SQLite.
 
 Para executar também a migração de dados e os mesmos fluxos da API em um PostgreSQL de testes, configure explicitamente `TEST_DATABASE_URL` e execute a suíte com o Python do ambiente virtual:
 

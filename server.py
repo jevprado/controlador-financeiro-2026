@@ -55,6 +55,24 @@ def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def allowed_emails():
+    """Missing or malformed configuration never enables public access."""
+    emails = {email.strip().lower() for email in os.environ.get("ALLOWED_EMAILS", "").split(",")}
+    if any(not EMAIL_RE.fullmatch(email) or len(email) > 254 for email in emails):
+        return frozenset()
+    return frozenset(emails)
+
+
+def registration_allowed(email, invite_code):
+    expected = os.environ.get("REGISTRATION_INVITE_CODE", "")
+    return (
+        email in allowed_emails()
+        and 32 <= len(expected) <= 256
+        and isinstance(invite_code, str)
+        and hmac.compare_digest(invite_code.encode(), expected.encode())
+    )
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "FinanceiroLocal/1.0"
 
@@ -89,6 +107,9 @@ class Handler(BaseHTTPRequestHandler):
                 JOIN users ON users.id = sessions.user_id
                 WHERE sessions.token_hash = ? AND sessions.expires_at > ?
             """, (token_hash(token), utc_now())).fetchone()
+            if row and row["email"].strip().lower() not in allowed_emails():
+                db.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash(token),))
+                return None
         return dict(row) if row else None
 
     def read_json(self):
@@ -166,6 +187,8 @@ class Handler(BaseHTTPRequestHandler):
             password = data.get("password", "")
             if not 2 <= len(name) <= 80 or not EMAIL_RE.fullmatch(email) or len(email) > 254 or not isinstance(password, str) or not 8 <= len(password) <= 128:
                 return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Confira nome, e-mail e senha (mínimo de 8 caracteres)."})
+            if not registration_allowed(email, data.get("invite_code")):
+                return self.send_json(HTTPStatus.FORBIDDEN, {"error": "Cadastro restrito. Confira seu e-mail e código de convite com o responsável."})
             with connect() as db:
                 cursor = db.execute("INSERT INTO users(name, email, password_hash, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING RETURNING id",
                                     (name, email, password_hash(password), utc_now()))
@@ -177,6 +200,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/login":
             email = str(data.get("email", "")).strip().lower()
             password = data.get("password", "")
+            if email not in allowed_emails():
+                return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "E-mail ou senha incorretos."})
             with connect() as db:
                 row = db.execute("SELECT id, name, email, password_hash FROM users WHERE email = ?", (email,)).fetchone()
             if not row or not isinstance(password, str) or not verify_password(password, row["password_hash"]):

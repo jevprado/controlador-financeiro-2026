@@ -52,10 +52,14 @@ function setMode(next) {
   const register = mode === 'register';
   $('#name-field').classList.toggle('hidden', !register);
   $('#name').required = register;
+  $('#invite-field').classList.toggle('hidden', !register);
+  $('#invite-code').required = register;
+  $('#invite-code').disabled = !register;
+  $('#invite-code').value = '';
   $('#password').autocomplete = register ? 'new-password' : 'current-password';
   $('#password-hint').classList.toggle('hidden', !register);
   $('#auth-title').innerHTML = register ? 'Comece com clareza<span>.</span>' : 'Bem-vindo de volta<span>.</span>';
-  $('#auth-subtitle').textContent = register ? 'Crie sua conta e organize suas finanças no seu ritmo.' : 'Entre na sua conta para continuar de onde parou.';
+  $('#auth-subtitle').textContent = register ? 'Use seu e-mail autorizado e o código de convite para criar sua conta.' : 'Entre na sua conta para continuar de onde parou.';
   $('#auth-submit').innerHTML = register ? 'Criar minha conta <span>→</span>' : 'Entrar na minha conta <span>→</span>';
   $('#switch-prompt').textContent = register ? 'Já tem uma conta?' : 'Ainda não tem uma conta?';
   $('#switch-mode').textContent = register ? 'Entrar' : 'Criar conta';
@@ -75,15 +79,18 @@ $('#auth-form').addEventListener('submit', async (event) => {
   const email = $('#email').value.trim();
   const password = $('#password').value;
   const name = $('#name').value.trim();
-  if ((mode === 'register' && name.length < 2) || !$('#email').validity.valid || password.length < (mode === 'register' ? 8 : 1)) {
-    $('#auth-error').textContent = mode === 'register' ? 'Informe nome, e-mail válido e senha com pelo menos 8 caracteres.' : 'Informe seu e-mail e senha.';
+  const inviteCode = $('#invite-code').value;
+  if ((mode === 'register' && (name.length < 2 || !inviteCode)) || !$('#email').validity.valid || password.length < (mode === 'register' ? 8 : 1)) {
+    $('#auth-error').textContent = mode === 'register' ? 'Informe nome, e-mail válido, senha com pelo menos 8 caracteres e código de convite.' : 'Informe seu e-mail e senha.';
     return;
   }
   const button = $('#auth-submit');
   button.disabled = true;
   $('#auth-error').textContent = '';
   try {
-    const data = await api(mode === 'register' ? '/api/register' : '/api/login', { method: 'POST', body: JSON.stringify({ name, email, password }) });
+    const body = { name, email, password };
+    if (mode === 'register') body.invite_code = inviteCode;
+    const data = await api(mode === 'register' ? '/api/register' : '/api/login', { method: 'POST', body: JSON.stringify(body) });
     $('#auth-form').reset();
     showDashboard(data.user);
   } catch (error) {

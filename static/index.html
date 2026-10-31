@@ -39,6 +39,7 @@
           <div id="name-field" class="field hidden"><label for="name">Seu nome</label><input id="name" name="name" autocomplete="name" placeholder="Como podemos chamar você?"></div>
           <div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="email" placeholder="voce@exemplo.com" required></div>
           <div class="field"><div class="label-row"><label for="password">Senha</label><span id="password-hint" class="hidden">Mínimo de 8 caracteres</span></div><div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Digite sua senha" required><button id="toggle-password" class="password-toggle" type="button" aria-label="Mostrar senha">Mostrar</button></div></div>
+          <div id="invite-field" class="field hidden"><label for="invite-code">Código de convite</label><input id="invite-code" name="invite_code" type="password" autocomplete="off" maxlength="256" placeholder="Código enviado pelo responsável" disabled></div>
           <p id="auth-error" class="form-error" role="alert" aria-live="polite"></p>
           <button id="auth-submit" class="primary-button" type="submit">Entrar na minha conta <span>→</span></button>
         </form>
