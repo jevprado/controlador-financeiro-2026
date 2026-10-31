@@ -1,4 +1,4 @@
-"""Servidor local do controlador financeiro, usando apenas a biblioteca padrão."""
+"""API do controlador financeiro com SQLite local ou PostgreSQL externo."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import json
 import os
 import re
 import secrets
-import sqlite3
+import database
 from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from http.cookies import SimpleCookie
@@ -26,44 +26,11 @@ KINDS = {"Cartão de crédito", "Cheque especial", "Empréstimo", "Outros"}
 
 
 def connect():
-    db = sqlite3.connect(DB_PATH, timeout=10)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys = ON")
-    return db
+    return database.connect(DB_PATH)
 
 
 def init_db():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with connect() as db:
-        db.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS sessions (
-                token_hash TEXT PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                expires_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS expenses (
-                id INTEGER PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                description TEXT NOT NULL,
-                kind TEXT NOT NULL,
-                account TEXT NOT NULL,
-                amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
-                due_date TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS expenses_user_date ON expenses(user_id, due_date);
-        """)
-        if "sort_order" not in {row["name"] for row in db.execute("PRAGMA table_info(expenses)")}:
-            db.execute("ALTER TABLE expenses ADD COLUMN sort_order INTEGER")
-        if "is_paid" not in {row["name"] for row in db.execute("PRAGMA table_info(expenses)")}:
-            db.execute("ALTER TABLE expenses ADD COLUMN is_paid INTEGER NOT NULL DEFAULT 0 CHECK(is_paid IN (0, 1))")
+    database.init_db(DB_PATH)
 
 
 def utc_now():
@@ -151,9 +118,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
             with connect() as db:
                 rows = db.execute("""
-                    SELECT account FROM expenses WHERE user_id = ?
-                    GROUP BY account COLLATE NOCASE
-                    ORDER BY account COLLATE NOCASE
+                    SELECT MIN(account) AS account FROM expenses WHERE user_id = ?
+                    GROUP BY lower(account)
+                    ORDER BY lower(MIN(account))
                 """, (user["id"],)).fetchall()
             return self.send_json(HTTPStatus.OK, {"accounts": [row["account"] for row in rows]})
         if path == "/api/expenses":
@@ -199,13 +166,13 @@ class Handler(BaseHTTPRequestHandler):
             password = data.get("password", "")
             if not 2 <= len(name) <= 80 or not EMAIL_RE.fullmatch(email) or len(email) > 254 or not isinstance(password, str) or not 8 <= len(password) <= 128:
                 return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Confira nome, e-mail e senha (mínimo de 8 caracteres)."})
-            try:
-                with connect() as db:
-                    cursor = db.execute("INSERT INTO users(name, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
-                                        (name, email, password_hash(password), utc_now()))
-                    user = {"id": cursor.lastrowid, "name": name, "email": email}
-            except sqlite3.IntegrityError:
-                return self.send_json(HTTPStatus.CONFLICT, {"error": "Este e-mail já está cadastrado."})
+            with connect() as db:
+                cursor = db.execute("INSERT INTO users(name, email, password_hash, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING RETURNING id",
+                                    (name, email, password_hash(password), utc_now()))
+                row = cursor.fetchone()
+                if row is None:
+                    return self.send_json(HTTPStatus.CONFLICT, {"error": "Este e-mail já está cadastrado."})
+                user = {"id": row["id"], "name": name, "email": email}
             return self.start_session(user, HTTPStatus.CREATED)
         if path == "/api/login":
             email = str(data.get("email", "")).strip().lower()
@@ -255,7 +222,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Informe um estado de pagamento válido."})
         with connect() as db:
             result = db.execute("UPDATE expenses SET is_paid = ? WHERE id = ? AND user_id = ?",
-                                (data["is_paid"], expense_id, user["id"]))
+                                (int(data["is_paid"]), expense_id, user["id"]))
         return self.send_json(HTTPStatus.OK if result.rowcount else HTTPStatus.NOT_FOUND,
                               {"is_paid": data["is_paid"]} if result.rowcount else {"error": "Lançamento não encontrado."})
 
@@ -272,7 +239,7 @@ class Handler(BaseHTTPRequestHandler):
                 or len(ids) != len(set(ids))):
             return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ordem de lançamentos inválida."})
         with connect() as db:
-            db.execute("BEGIN IMMEDIATE")
+            db.lock_expense_order(user["id"])
             existing = {row["id"] for row in db.execute(
                 "SELECT id FROM expenses WHERE user_id = ? AND substr(due_date, 1, 7) = ?",
                 (user["id"], month))}
@@ -306,12 +273,13 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 cursor = db.execute("""
                     INSERT INTO expenses(user_id, description, kind, account, amount_cents, due_date, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
                 """, (user["id"], description, kind, account, amount_cents, due_date, utc_now()))
+                created_id = cursor.fetchone()["id"]
         if expense_id is not None:
             return self.send_json(HTTPStatus.OK if result.rowcount else HTTPStatus.NOT_FOUND,
                                   {"id": expense_id} if result.rowcount else {"error": "Lançamento não encontrado."})
-        return self.send_json(HTTPStatus.CREATED, {"id": cursor.lastrowid})
+        return self.send_json(HTTPStatus.CREATED, {"id": created_id})
 
     def do_DELETE(self):
         path = urlsplit(self.path).path

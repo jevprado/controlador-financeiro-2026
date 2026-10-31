@@ -1,3 +1,8 @@
 data/
 __pycache__/
 *.pyc
+.env
+.env.*
+!.env.example
+.venv/
+/ANALISE_PUBLICACAO_VERCEL.md

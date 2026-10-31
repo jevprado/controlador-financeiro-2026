@@ -8,11 +8,13 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import server
+from database_test_support import isolated_database
 
 
 class FinanceFlowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.enterClassContext(isolated_database())
         cls.temp = tempfile.TemporaryDirectory()
         server.DB_PATH = Path(cls.temp.name) / "finance.db"
         server.init_db()
@@ -39,6 +41,13 @@ class FinanceFlowTest(unittest.TestCase):
             response = error
         with response:
             return response.status, json.load(response), response.headers.get("Set-Cookie", "").split(";", 1)[0]
+
+    def test_duplicate_registration_preserves_original_login(self):
+        original = {"name": "Iara", "email": "iara@example.com", "password": "senha-original"}
+        self.assertEqual(self.call("/api/register", "POST", original)[0], 201)
+        self.assertEqual(self.call("/api/register", "POST", {**original, "password": "outra-senha"})[0], 409)
+        self.assertEqual(self.call("/api/login", "POST", original)[0], 200)
+        self.assertEqual(self.call("/api/login", "POST", {**original, "password": "outra-senha"})[0], 401)
 
     def test_edit_expense(self):
         _, _, owner = self.call("/api/register", "POST", {"name": "Caio", "email": "caio@example.com", "password": "senha-segura"})
