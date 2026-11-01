@@ -1242,6 +1242,22 @@ button {
   .transactions {
     margin-top: 35px;
   }
+
+  .expense-row {
+    display: grid;
+    grid-template-columns: 28px 38px minmax(0, 1fr) max-content;
+  }
+
+  .expense-details strong,
+  .expense-details span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .expense-actions {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
 }
 
 @media (max-width: 430px) {
@@ -1264,6 +1280,7 @@ button {
   .expense-row {
     padding: 15px 12px;
     gap: 9px;
+    grid-template-columns: 28px 32px minmax(0, 1fr) max-content;
   }
 
   .expense-icon {
@@ -1283,13 +1300,5 @@ button {
   .form-row {
     grid-template-columns: 1fr;
     gap: 0;
-  }
-
-  .expense-row {
-    flex-wrap: wrap;
-  }
-
-  .expense-actions {
-    margin-left: auto;
   }
 }
