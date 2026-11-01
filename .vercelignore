@@ -1,0 +1,7 @@
+.env
+.env.*
+data/
+tests/
+__pycache__/
+.venv/
+*.png

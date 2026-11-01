@@ -128,7 +128,17 @@ O arquivo [.env.example](.env.example) mostra o formato da configuração. Arqui
 
 As conexões são abertas por operação, concluídas com commit ou rollback e fechadas ao final. Prepared statements automáticos estão desativados para compatibilidade com endpoints de pool por transação. TLS é exigido por padrão; `sslmode=disable` serve apenas para um PostgreSQL local de desenvolvimento e é recusado quando `VERCEL` está definida.
 
-**Este ajuste resolve a camada de persistência. A adaptação do servidor HTTP para um ponto de entrada da Vercel continua pendente.** Não basta configurar o banco para publicar o projeto completo.
+### Publicar na Vercel
+
+O arquivo `vercel.json` publica a pasta `static/` e encaminha `/api/*` para a função Python em `api/index.py`. Use o preset **Other**, sem sobrescrever o Build Command ou Output Directory no painel; a configuração do repositório define a saída como `static`. O runtime instala o driver listado em `requirements.txt`.
+
+Configure `DATABASE_URL`, `ALLOWED_EMAILS` e `REGISTRATION_INVITE_CODE` em **Production**, publique a versão atual do repositório e aguarde o deployment ficar **Ready**. As variáveis e o código devem estar presentes no novo deployment.
+
+A função inicializa as tabelas no primeiro acesso à API de cada instância, antes de executar o cadastro ou consultar uma sessão. A inicialização é repetível e preserva registros existentes. O usuário PostgreSQL precisa de permissão para criar a estrutura no schema configurado. Se a inicialização falhar, uma tentativa posterior pode repeti-la.
+
+As respostas de erro da função são JSON, com uma referência que também aparece nos logs. A interface também trata erros em texto ou HTML enviados pela plataforma, exibindo uma mensagem legível.
+
+Se os logs mostrarem `UndefinedTable` e `relation "sessions" does not exist` (ou `users` / `expenses`), o banco está acessível, mas sua estrutura está ausente ou em outro schema. Publicar esta versão executa a inicialização automática. Também é possível inicializar antecipadamente com `.venv/bin/python database.py`, usando a mesma `DATABASE_URL` do ambiente de produção no terminal.
 
 ### Transferir dados existentes do SQLite
 
@@ -162,6 +172,8 @@ O servidor escuta apenas em `127.0.0.1`. Para acesso público, use HTTPS e confi
 
 ```text
 server.py           Servidor HTTP, autenticação e API
+api/index.py        Entrada da Vercel e inicialização automática do banco
+vercel.json         Publicação dos arquivos estáticos e rotas da API
 database.py         Conexões, transações e estrutura SQLite/PostgreSQL
 migrate_sqlite.py   Transferência de SQLite para PostgreSQL vazio
 requirements.txt    Driver PostgreSQL
@@ -169,6 +181,7 @@ requirements.txt    Driver PostgreSQL
 static/index.html   Estrutura das telas de acesso e painel financeiro
 static/styles.css   Estilos e adaptações para diferentes tamanhos de tela
 static/app.js       Interações, chamadas à API e cálculo dos cards
+static/api.js       Cliente HTTP e tratamento de respostas inválidas
 tests/test_flow.py  Testes de integração da API
 data/finance.db     Banco local criado na execução (não versionado)
 ```
@@ -192,3 +205,12 @@ Para executar também a migração de dados e os mesmos fluxos da API em um Post
 Use um banco descartável e uma conexão direta de teste com permissão de criar schemas. A suíte cria schemas exclusivos e os remove ao final. `TEST_DATABASE_URL` nunca deve apontar para produção. Sem essa variável, os testes específicos de PostgreSQL são indicados como ignorados.
 
 Se tiver Node.js disponível, a sintaxe do JavaScript também pode ser verificada com `node --check static/app.js`. Node.js não é necessário para executar a aplicação.
+
+Para testar os fluxos HTTP pelo ponto de entrada da Vercel, inicialização do banco e tratamento de falhas:
+
+```bash
+TEST_VERCEL_HANDLER=1 python3 -m unittest discover -s tests -v
+node --test tests/test_api_client.cjs
+```
+
+Os testes locais não executam um deployment real. A validação final deve ser feita no endereço publicado, verificando cadastro e login e os logs da Vercel.

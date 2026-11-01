@@ -160,6 +160,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(HTTPStatus.OK, {"expenses": [{**dict(row), "is_paid": bool(row["is_paid"])} for row in rows]})
         files = {"/": ("index.html", "text/html; charset=utf-8"),
                  "/styles.css": ("styles.css", "text/css; charset=utf-8"),
+                 "/api.js": ("api.js", "text/javascript; charset=utf-8"),
                  "/app.js": ("app.js", "text/javascript; charset=utf-8")}
         if path not in files:
             return self.send_error(HTTPStatus.NOT_FOUND)

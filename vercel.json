@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "static",
+  "buildCommand": "",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index" }
+  ],
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "static/**",
+      "excludeFiles": "{tests/**,data/**,**/*.png,**/*.md,.env,.env.*}",
+      "maxDuration": 30
+    }
+  }
+}

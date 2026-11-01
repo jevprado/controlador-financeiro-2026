@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 from unittest.mock import patch
 
 import server
+from api import index as vercel_entrypoint
 from database_test_support import isolated_database
 
 
@@ -27,7 +28,11 @@ class FinanceFlowTest(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         server.DB_PATH = Path(cls.temp.name) / "finance.db"
         server.init_db()
-        cls.http = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        handler = server.Handler
+        if os.environ.get("TEST_VERCEL_HANDLER"):
+            cls.enterClassContext(patch.object(vercel_entrypoint, "_database_ready", False))
+            handler = vercel_entrypoint.handler
+        cls.http = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         cls.thread = threading.Thread(target=cls.http.serve_forever, daemon=True)
         cls.thread.start()
         cls.base = f"http://127.0.0.1:{cls.http.server_port}"

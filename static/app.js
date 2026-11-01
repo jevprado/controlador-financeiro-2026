@@ -15,18 +15,6 @@ orderStatus.setAttribute('role', 'status');
 orderStatus.setAttribute('aria-live', 'polite');
 $('#expense-list').before(orderStatus);
 
-async function api(path, options = {}) {
-  let response;
-  try {
-    response = await fetch(path, { credentials: 'same-origin', ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } });
-  } catch {
-    throw new Error('Não foi possível conectar. Tente novamente.');
-  }
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Algo deu errado. Tente novamente.');
-  return data;
-}
-
 function showAuth() {
   currentUser = null;
   accountNames = [];
