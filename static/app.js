@@ -10,12 +10,17 @@ let activeAccountOption = -1;
 let editingExpenseId = null;
 let savingOrder = false;
 let expenseRequest = 0;
+let comparisonRequest = 0;
+let monthlyTotals = null;
 const orderStatus = makeElement('p', 'order-status');
 orderStatus.setAttribute('role', 'status');
 orderStatus.setAttribute('aria-live', 'polite');
 $('#expense-list').before(orderStatus);
 
 function showAuth() {
+  expenseRequest++;
+  comparisonRequest++;
+  monthlyTotals = null;
   currentUser = null;
   accountNames = [];
   $('#loading').classList.add('hidden');
@@ -32,8 +37,107 @@ function showDashboard(user) {
   $('#greeting-name').textContent = firstName;
   $('#sidebar-name').textContent = user.name;
   $('#avatar').textContent = firstName[0].toUpperCase();
+  showPage();
   loadExpenses();
 }
+
+function shiftMonth(value, offset) {
+  const [year, month] = value.split('-').map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1 + offset, 1);
+  return `${String(date.getUTCFullYear()).padStart(4, '0')}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function showPage() {
+  const comparing = location.hash === '#comparador';
+  $('#inicio').classList.toggle('hidden', comparing);
+  $('#comparador').classList.toggle('hidden', !comparing);
+  const active = comparing ? '#comparador' : location.hash === '#lancamentos' ? '#lancamentos' : '#inicio';
+  document.querySelectorAll('nav a').forEach((link) => {
+    link.classList.toggle('nav-active', link.hash === active);
+    if (link.hash === active) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
+  if (comparing && currentUser) loadComparison();
+}
+window.addEventListener('hashchange', showPage);
+
+function renderComparison() {
+  if (!monthlyTotals) return;
+  const base = $('#comparison-base').value;
+  const target = $('#comparison-target').value;
+  if (!base || !target || !$('#comparison-base').validity.valid || !$('#comparison-target').validity.valid) {
+    $('#comparison-results').classList.add('hidden');
+    $('#comparison-status').textContent = 'Selecione dois meses válidos para comparar.';
+    return;
+  }
+  const totals = new Map(monthlyTotals.map((item) => [item.month, item]));
+  const entry = (month) => totals.get(month) || { total_cents: 0, expense_count: 0 };
+  for (const [key, month] of [['base', base], ['target', target]]) {
+    const item = entry(month);
+    $(`#comparison-${key}-label`).textContent = monthName(month);
+    $(`#comparison-${key}-total`).textContent = money(item.total_cents);
+    $(`#comparison-${key}-count`).textContent = item.expense_count ? `${item.expense_count} ${item.expense_count === 1 ? 'lançamento' : 'lançamentos'}` : 'Sem lançamentos';
+  }
+  const initial = entry(base).total_cents;
+  const difference = entry(target).total_cents - initial;
+  const direction = difference > 0 ? 'Aumento' : difference < 0 ? 'Redução' : 'Sem variação';
+  const result = $('#comparison-difference');
+  result.textContent = `${difference > 0 ? '+' : difference < 0 ? '−' : ''}${money(Math.abs(difference))}`;
+  result.classList.toggle('spending-increase', difference > 0);
+  result.classList.toggle('spending-decrease', difference < 0);
+  $('#comparison-percentage').textContent = initial === 0 && difference !== 0
+    ? 'Aumento · percentual indisponível: referência com total zero.'
+    : `${direction}${initial ? ` de ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(Math.abs(difference / initial * 100))}%` : ' (0%)'} em relação à referência.`;
+  const months = Array.from({ length: 6 }, (_, index) => shiftMonth(target, index - 5));
+  const maximum = Math.max(...months.map((month) => entry(month).total_cents), 1);
+  const chart = $('#comparison-chart');
+  chart.replaceChildren();
+  for (const month of months) {
+    const item = entry(month);
+    const row = makeElement('div', 'comparison-chart-row');
+    row.setAttribute('role', 'listitem');
+    const label = makeElement('span', 'comparison-chart-label', monthName(month));
+    const track = makeElement('div', 'comparison-track');
+    track.setAttribute('aria-hidden', 'true');
+    const bar = makeElement('div', 'comparison-bar');
+    bar.style.width = `${item.total_cents / maximum * 100}%`;
+    track.append(bar);
+    const value = makeElement('strong', '', money(item.total_cents));
+    const details = makeElement('div', 'comparison-chart-value');
+    details.append(value);
+    if (!item.expense_count) details.append(makeElement('small', '', 'Sem lançamentos'));
+    row.append(label, track, details);
+    chart.append(row);
+  }
+  $('#comparison-status').textContent = '';
+  $('#comparison-results').classList.remove('hidden');
+}
+
+async function loadComparison() {
+  const request = ++comparisonRequest;
+  const userId = currentUser?.id;
+  monthlyTotals = null;
+  $('#comparison-results').classList.add('hidden');
+  $('#comparison-retry').classList.add('hidden');
+  $('#comparison-status').textContent = 'Carregando totais mensais…';
+  try {
+    const data = await api('/api/expenses/monthly-totals');
+    if (request !== comparisonRequest || currentUser?.id !== userId) return;
+    monthlyTotals = data.months;
+    renderComparison();
+  } catch (error) {
+    if (request !== comparisonRequest || currentUser?.id !== userId) return;
+    if (error.message === 'Faça login para continuar.') showAuth();
+    else {
+      $('#comparison-status').textContent = error.message;
+      $('#comparison-retry').classList.remove('hidden');
+    }
+  }
+}
+$('#comparison-base').addEventListener('change', renderComparison);
+$('#comparison-target').addEventListener('change', renderComparison);
+$('#comparison-retry').addEventListener('click', loadComparison);
 
 function setMode(next) {
   mode = next;
@@ -457,4 +561,6 @@ $('#expense-form').addEventListener('submit', async (event) => {
 });
 
 $('#month').value = today().slice(0, 7);
+$('#comparison-target').value = $('#month').value;
+$('#comparison-base').value = shiftMonth($('#month').value, -1);
 api('/api/me').then(({ user }) => user ? showDashboard(user) : showAuth()).catch(showAuth);

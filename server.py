@@ -144,6 +144,18 @@ class Handler(BaseHTTPRequestHandler):
                     ORDER BY lower(MIN(account))
                 """, (user["id"],)).fetchall()
             return self.send_json(HTTPStatus.OK, {"accounts": [row["account"] for row in rows]})
+        if path == "/api/expenses/monthly-totals":
+            user = self.current_user()
+            if not user:
+                return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
+            with connect() as db:
+                rows = db.execute("""
+                    SELECT substr(due_date, 1, 7) AS month, SUM(amount_cents) AS total_cents,
+                        COUNT(*) AS expense_count
+                    FROM expenses WHERE user_id = ?
+                    GROUP BY substr(due_date, 1, 7) ORDER BY month
+                """, (user["id"],)).fetchall()
+            return self.send_json(HTTPStatus.OK, {"months": [dict(row) for row in rows]})
         if path == "/api/expenses":
             user = self.current_user()
             if not user:

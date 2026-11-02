@@ -204,6 +204,32 @@ class FinanceFlowTest(unittest.TestCase):
         self.assertEqual(self.call(f"/api/expenses/{ids[2]}", "DELETE", cookie=owner)[0], 200)
         self.assertEqual(listed_ids(), [ids[1], new_id])
 
+    def test_monthly_totals_include_all_expenses_and_are_isolated(self):
+        # Use independent accounts so other flow fixtures do not affect totals.
+        with patch.dict(os.environ, {"ALLOWED_EMAILS": "totais@example.com,outro-total@example.com"}):
+            _, _, owner = self.call("/api/register", "POST", {"name": "Totais", "email": "totais@example.com", "password": "senha-segura"})
+            _, _, other = self.call("/api/register", "POST", {"name": "Outro", "email": "outro-total@example.com", "password": "senha-segura"})
+            path = "/api/expenses/monthly-totals"
+            self.assertEqual(self.call(path)[0], 401)
+            self.assertEqual(self.call(path, cookie=owner)[1], {"months": []})
+            expense = {"description": "Fatura", "kind": "Cartão de crédito", "account": "Cartão", "amount_cents": 12550, "due_date": "2025-12-15"}
+            _, created, _ = self.call("/api/expenses", "POST", expense, owner)
+            self.call(f"/api/expenses/{created['id']}/payment", "PUT", {"is_paid": True}, owner)
+            self.call("/api/expenses", "POST", {**expense, "kind": "Outros", "amount_cents": 50}, owner)
+            self.call("/api/expenses", "POST", {**expense, "amount_cents": 30000, "due_date": "2026-02-01"}, owner)
+            self.call("/api/expenses", "POST", expense, other)
+            self.assertEqual(self.call(path, cookie=owner)[1], {"months": [
+                {"month": "2025-12", "total_cents": 12600, "expense_count": 2},
+                {"month": "2026-02", "total_cents": 30000, "expense_count": 1},
+            ]})
+            self.assertEqual(self.call(path, cookie=other)[1]["months"], [
+                {"month": "2025-12", "total_cents": 12550, "expense_count": 1},
+            ])
+            self.call(f"/api/expenses/{created['id']}", "PUT", {**expense, "due_date": "2026-02-01"}, owner)
+            self.assertEqual(self.call(path, cookie=owner)[1]["months"][1]["total_cents"], 42550)
+            self.call(f"/api/expenses/{created['id']}", "DELETE", cookie=owner)
+            self.assertEqual(self.call(path, cookie=owner)[1]["months"][1]["total_cents"], 30000)
+
     def test_accounts_are_isolated(self):
         status, _, first = self.call("/api/register", "POST", {"name": "Ana", "email": "ana@example.com", "password": "senha-segura"})
         self.assertEqual(status, 201)

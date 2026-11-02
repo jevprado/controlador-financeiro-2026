@@ -8,6 +8,7 @@ O servidor utiliza Python, com SQLite para uso local ou PostgreSQL externo quand
 
 - Cadastro por convite para e-mails autorizados, login e encerramento de sessão.
 - Seleção do mês para consultar os lançamentos e o resumo financeiro.
+- Submenu **Dashboard**, abaixo de **Visão geral**, com comparação entre dois meses: totais de despesas, diferença em reais e percentual, e gráfico dos seis meses até o mês comparado. Inclui despesas pagas e pendentes; meses sem lançamentos têm total zero. Quando a referência tem total zero e há aumento, o percentual é indicado como indisponível.
 - Criação, edição e exclusão de lançamentos com descrição, tipo, conta ou cartão, valor e data.
 - Tipos disponíveis: cartão de crédito, cheque especial, empréstimo e outros.
 - Sugestões de contas e cartões já utilizados pelo usuário, permitindo também digitar novos nomes.

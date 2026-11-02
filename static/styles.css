@@ -556,6 +556,82 @@ button {
   display: none;
 }
 
+.mobile-nav {
+  display: none;
+}
+
+.comparison-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 28px;
+}
+
+.comparison-filters input {
+  min-width: 0;
+}
+
+.comparison-note,
+#comparison-status {
+  color: #68786b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+#comparison-results .summary-card strong {
+  font-size: clamp(19px, 2.2vw, 28px);
+  overflow-wrap: anywhere;
+}
+
+#comparison-results .summary-card small {
+  line-height: 1.6;
+}
+
+#comparison-results .spending-increase {
+  color: #b33d35;
+}
+
+#comparison-results .spending-decrease {
+  color: #376543;
+}
+
+.comparison-chart {
+  display: grid;
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.comparison-chart-row {
+  display: grid;
+  grid-template-columns: 155px minmax(0, 1fr) 145px;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.comparison-chart-value {
+  text-align: right;
+}
+
+.comparison-chart-value small {
+  display: block;
+  color: #68786b;
+  margin-top: 4px;
+}
+
+.comparison-track {
+  height: 18px;
+  background: #edf2e9;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.comparison-bar {
+  height: 100%;
+  background: #66825c;
+  border-radius: inherit;
+}
+
 .content {
   max-width: 1190px;
   margin: 0 auto;
@@ -1128,6 +1204,46 @@ button {
 }
 
 @media (max-width: 700px) {
+  .mobile-nav {
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px;
+    background: #fff;
+    flex-wrap: wrap;
+  }
+
+  .mobile-nav a {
+    padding: 10px;
+    text-decoration: none;
+    color: #486f4a;
+    border-radius: 8px;
+    font-size: 12px;
+  }
+
+  .mobile-nav .nav-active {
+    background: #edf5e9;
+    font-weight: 700;
+  }
+
+  #comparison-results .summary-grid,
+  .comparison-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-filters {
+    gap: 0;
+  }
+
+  .comparison-chart-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .comparison-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
   .auth-layout {
     display: block;
   }

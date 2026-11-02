@@ -54,16 +54,31 @@
   <main id="dashboard" class="dashboard hidden">
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">✳</span> clara<span class="brand-dot">.</span></div>
-      <nav aria-label="Navegação principal"><a class="nav-active" href="#inicio"><span>▦</span> Visão geral</a><a href="#lancamentos"><span>≡</span> Lançamentos</a></nav>
+      <nav aria-label="Navegação principal"><a class="nav-active" href="#inicio"><span>▦</span> Visão geral</a><a href="#comparador"><span>↗</span> Dashboard</a><a href="#lancamentos"><span>≡</span> Lançamentos</a></nav>
       <div class="sidebar-bottom"><div class="avatar" id="avatar">U</div><div class="sidebar-user"><strong id="sidebar-name"></strong><small>Minha conta</small></div><button id="logout" title="Sair da conta" aria-label="Sair da conta">↪</button></div>
     </aside>
     <div class="dashboard-main">
       <header class="topbar"><div class="mobile-brand brand"><span class="brand-mark">✳</span> clara<span class="brand-dot">.</span></div><span>Seu espaço financeiro</span><button id="mobile-logout" type="button">Sair</button></header>
+      <nav class="mobile-nav" aria-label="Navegação principal no celular"><a href="#inicio">Visão geral</a><a href="#comparador">Dashboard</a><a href="#lancamentos">Lançamentos</a></nav>
       <div class="content" id="inicio">
         <div class="page-header"><div><span class="eyebrow">PAINEL FINANCEIRO</span><h1>Olá, <span id="greeting-name"></span> <span class="wave">✳</span></h1><p>Seu dinheiro em perspectiva, um mês de cada vez.</p></div><button id="new-expense" class="primary-button compact" type="button">+ Novo lançamento</button></div>
         <div class="month-bar"><div><span class="month-icon">▦</span><span>Visão de <strong id="month-label"></strong></span></div><input id="month" type="month" aria-label="Selecionar mês"></div>
         <section class="summary-grid" aria-label="Resumo do mês"><div class="summary-card featured"><span class="summary-icon">↗</span><p>Total de despesas</p><strong id="total-amount">R$ 0,00</strong><small>Compromissos deste mês</small></div><div class="summary-card"><span class="summary-icon lavender">▤</span><p>Cartões de crédito</p><strong id="cards-amount">R$ 0,00</strong><small id="cards-count">0 lançamentos</small></div><div class="summary-card"><span class="summary-icon peach">◎</span><p>Pendências</p><strong id="pending-amount">R$ 0,00</strong><small id="pending-count">0 lançamentos pendentes</small></div></section>
         <section class="transactions" id="lancamentos"><div class="section-heading"><div><span class="eyebrow">SEUS COMPROMISSOS</span><h2>Lançamentos do mês</h2></div><span id="expense-count" class="count-pill">0 lançamentos</span></div><div id="expense-list" class="expense-list"></div></section>
+      </div>
+      <div class="content hidden" id="comparador">
+        <div class="page-header"><div><span class="eyebrow">DASHBOARD</span><h1>Evolução dos gastos</h1><p>Compare os totais de despesas entre meses.</p></div></div>
+        <div class="comparison-filters"><div class="field"><label for="comparison-base">Mês de referência</label><input id="comparison-base" type="month" required></div><div class="field"><label for="comparison-target">Mês para comparar</label><input id="comparison-target" type="month" required></div></div>
+        <p class="comparison-note">Totais por mês da data do lançamento, incluindo despesas pagas e pendentes. Meses sem lançamentos têm total de R$ 0,00.</p>
+        <p id="comparison-status" role="status" aria-live="polite"></p><button id="comparison-retry" class="secondary-button hidden" type="button">Tentar novamente</button>
+        <div id="comparison-results" class="hidden">
+          <section class="summary-grid" aria-label="Comparação dos meses" aria-live="polite">
+            <div class="summary-card"><span class="summary-icon lavender">▦</span><p id="comparison-base-label"></p><strong id="comparison-base-total"></strong><small id="comparison-base-count"></small></div>
+            <div class="summary-card"><span class="summary-icon peach">▦</span><p id="comparison-target-label"></p><strong id="comparison-target-total"></strong><small id="comparison-target-count"></small></div>
+            <div class="summary-card"><span class="summary-icon">↗</span><p>Variação dos gastos</p><strong id="comparison-difference"></strong><small id="comparison-percentage"></small></div>
+          </section>
+          <section class="transactions"><div class="section-heading"><div><span class="eyebrow">HISTÓRICO MENSAL</span><h2>Evolução das despesas</h2></div></div><p class="comparison-note">Seis meses até o mês escolhido para comparar.</p><div id="comparison-chart" class="comparison-chart" role="list" aria-label="Totais mensais de despesas"></div></section>
+        </div>
       </div>
     </div>
   </main>
