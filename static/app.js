@@ -11,6 +11,7 @@ let editingExpenseId = null;
 let savingOrder = false;
 let expenseRequest = 0;
 let comparisonRequest = 0;
+let recurringRequest = 0;
 let monthlyTotals = null;
 const orderStatus = makeElement('p', 'order-status');
 orderStatus.setAttribute('role', 'status');
@@ -20,6 +21,7 @@ $('#expense-list').before(orderStatus);
 function showAuth() {
   expenseRequest++;
   comparisonRequest++;
+  recurringRequest++;
   monthlyTotals = null;
   currentUser = null;
   accountNames = [];
@@ -55,17 +57,65 @@ function defaultComparisonPeriod(date = new Date()) {
 
 function showPage() {
   const comparing = location.hash === '#comparador';
-  $('#inicio').classList.toggle('hidden', comparing);
+  const recurring = location.hash === '#recorrentes';
+  $('#inicio').classList.toggle('hidden', comparing || recurring);
   $('#comparador').classList.toggle('hidden', !comparing);
-  const active = comparing ? '#comparador' : location.hash === '#lancamentos' ? '#lancamentos' : '#inicio';
+  $('#recorrentes').classList.toggle('hidden', !recurring);
+  const active = recurring ? '#recorrentes' : comparing ? '#comparador' : location.hash === '#lancamentos' ? '#lancamentos' : '#inicio';
   document.querySelectorAll('nav a').forEach((link) => {
     link.classList.toggle('nav-active', link.hash === active);
     if (link.hash === active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
   if (comparing && currentUser) loadComparison();
+  if (recurring && currentUser) loadRecurring();
 }
 window.addEventListener('hashchange', showPage);
+
+async function loadRecurring() {
+  const request = ++recurringRequest;
+  const userId = currentUser?.id;
+  const list = $('#recurring-list');
+  list.replaceChildren();
+  $('#recurring-status').textContent = 'Carregando gastos recorrentes…';
+  $('#recurring-retry').classList.add('hidden');
+  try {
+    const data = await api('/api/recurring-expenses');
+    if (request !== recurringRequest || currentUser?.id !== userId) return;
+    $('#recurring-status').textContent = data.recurring_expenses.length ? '' : 'Nenhum gasto recorrente cadastrado. Adicione despesas fixas, como plano de saúde, aluguel ou internet.';
+    for (const item of data.recurring_expenses) {
+      const row = makeElement('div', 'recurring-row');
+      const details = makeElement('div', 'expense-details');
+      details.append(makeElement('strong', '', item.description), makeElement('span', '', `${item.account} · ${item.kind}`), makeElement('span', '', `Todo dia ${Number(item.first_due_date.slice(8))} · desde ${monthName(item.first_due_date.slice(0, 7))}`));
+      const value = makeElement('strong', 'recurring-value', `${money(item.amount_cents)} / mês`);
+      const stop = makeElement('button', 'edit-button', 'Encerrar recorrência');
+      stop.type = 'button';
+      stop.setAttribute('aria-label', `Encerrar recorrência de ${item.description}`);
+      stop.addEventListener('click', async () => {
+        if (!confirm(`Encerrar a recorrência de "${item.description}"? Os lançamentos já gerados serão mantidos.`)) return;
+        stop.disabled = true;
+        try {
+          await api(`/api/recurring-expenses/${item.id}`, { method: 'DELETE' });
+          await loadRecurring();
+        } catch (error) {
+          alert(error.message);
+          stop.disabled = false;
+        }
+      });
+      row.append(makeExpenseIcon(item.kind), details, value, stop);
+      list.append(row);
+    }
+  } catch (error) {
+    if (request !== recurringRequest || currentUser?.id !== userId) return;
+    if (error.message === 'Faça login para continuar.') showAuth();
+    else {
+      $('#recurring-status').textContent = error.message;
+      $('#recurring-retry').classList.remove('hidden');
+    }
+  }
+}
+$('#recurring-retry').addEventListener('click', loadRecurring);
+$('#new-recurring').addEventListener('click', () => openDialog(null, true));
 
 function renderComparison() {
   if (!monthlyTotals) return;
@@ -125,7 +175,7 @@ function renderTrendChart(series) {
     if (content !== undefined) node.textContent = content;
     return node;
   };
-  const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Gráfico de linha da evolução mensal das despesas. Valores e variações na tabela abaixo.' });
+  const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Gráfico de linha da evolução mensal das despesas. Totais por mês no gráfico de barras abaixo.' });
   svg.style.minWidth = `${width}px`;
   for (let step = 0; step <= 4; step++) {
     const y = bottom - step / 4 * (bottom - top);
@@ -146,20 +196,18 @@ function renderTrendChart(series) {
     svg.append(point);
     const label = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(`${item.month}-01T12:00:00Z`));
     svg.append(svgElement('text', { x, y: bottom + 30, 'text-anchor': 'middle', class: 'trend-label' }, label));
-    const row = makeElement('tr');
-    const heading = makeElement('th', '', monthName(item.month));
-    heading.setAttribute('scope', 'row');
-    const value = makeElement('td', '', money(item.total_cents));
+    const row = makeElement('div', 'comparison-chart-row');
+    row.setAttribute('role', 'listitem');
+    const heading = makeElement('span', 'comparison-chart-label', monthName(item.month));
+    const track = makeElement('div', 'comparison-track');
+    track.setAttribute('aria-hidden', 'true');
+    const bar = makeElement('div', 'comparison-bar');
+    bar.style.width = `${item.total_cents / maximum * 100}%`;
+    track.append(bar);
+    const value = makeElement('div', 'comparison-chart-value');
+    value.append(makeElement('strong', '', money(item.total_cents)));
     if (!item.expense_count) value.append(makeElement('small', '', 'Sem lançamentos'));
-    let change = '—';
-    if (index > 0) {
-      const previous = series[index - 1].total_cents;
-      const difference = item.total_cents - previous;
-      const sign = difference > 0 ? '+' : difference < 0 ? '−' : '';
-      const percentage = previous ? `${sign}${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(Math.abs(difference / previous * 100))}%` : difference ? 'percentual indisponível: base zero' : '0%';
-      change = `${sign}${money(Math.abs(difference))} (${percentage})`;
-    }
-    row.append(heading, value, makeElement('td', '', change));
+    row.append(heading, track, value);
     rows.append(row);
   });
   chart.append(svg);
@@ -560,13 +608,16 @@ $('.account-combobox').addEventListener('focusout', (event) => {
   if (!event.currentTarget.contains(event.relatedTarget)) closeAccountOptions();
 });
 
-function openDialog(item = null) {
+function openDialog(item = null, recurring = false) {
   editingExpenseId = item ? item.id : null;
   $('#expense-form').reset();
+  $('#recurring-field').classList.toggle('hidden', Boolean(item));
+  $('#repeat-monthly').disabled = Boolean(item);
+  $('#repeat-monthly').checked = recurring;
   closeAccountOptions();
   $('#expense-error').textContent = '';
   $('.dialog-head .eyebrow').textContent = item ? 'EDITAR COMPROMISSO' : 'NOVO COMPROMISSO';
-  $('.dialog-head h2').textContent = item ? 'Editar lançamento' : 'Adicionar lançamento';
+  $('.dialog-head h2').textContent = item ? 'Editar lançamento' : recurring ? 'Adicionar gasto recorrente' : 'Adicionar lançamento';
   $('#save-expense').textContent = item ? 'Salvar alterações' : 'Salvar lançamento →';
   $('#due-date').value = item ? item.due_date : today();
   if (item) {
@@ -597,13 +648,15 @@ $('#expense-form').addEventListener('submit', async (event) => {
   const button = $('#save-expense');
   if (button.disabled) return;
   button.disabled = true;
+  const recurring = editingExpenseId === null && $('#repeat-monthly').checked;
   try {
-    await api(editingExpenseId === null ? '/api/expenses' : `/api/expenses/${editingExpenseId}`, {
+    await api(recurring ? '/api/recurring-expenses' : editingExpenseId === null ? '/api/expenses' : `/api/expenses/${editingExpenseId}`, {
       method: editingExpenseId === null ? 'POST' : 'PUT', body: JSON.stringify(body),
     });
     $('#expense-dialog').close();
     $('#month').value = body.due_date.slice(0, 7);
     await loadExpenses();
+    if (location.hash === '#recorrentes') await loadRecurring();
   } catch (error) {
     $('#expense-error').textContent = error.message;
   } finally {

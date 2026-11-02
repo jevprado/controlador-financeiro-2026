@@ -9,12 +9,14 @@ import os
 import re
 import secrets
 import database
+from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit
+from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parent
@@ -35,6 +37,43 @@ def init_db():
 
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def current_month():
+    return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%Y-%m")
+
+
+def valid_month(value):
+    return isinstance(value, str) and bool(re.fullmatch(r"[0-9]{4}-(0[1-9]|1[0-2])", value)) and value[:4] != "0000"
+
+
+def generate_recurring(user_id, requested_month=None):
+    """Materialize each monthly occurrence once, including months missed between visits."""
+    with connect() as db:
+        db.lock_expense_order(user_id)
+        materialize_recurring(db, user_id, requested_month)
+
+
+def materialize_recurring(db, user_id, requested_month=None):
+    through = current_month()
+    rules = db.execute("SELECT * FROM recurring_expenses WHERE user_id = ? AND is_active = 1", (user_id,)).fetchall()
+    for rule in rules:
+        first = date.fromisoformat(rule["first_due_date"])
+        existing = {row["month"] for row in db.execute(
+            "SELECT month FROM recurring_occurrences WHERE recurring_id = ?", (rule["id"],))}
+        first_index = first.year * 12 + first.month - 1
+        last_index = int(through[:4]) * 12 + int(through[5:]) - 1
+        periods = {f"{index // 12:04d}-{index % 12 + 1:02d}" for index in range(first_index, last_index + 1)}
+        if requested_month and requested_month >= rule["first_due_date"][:7]:
+            periods.add(requested_month)
+        for period in sorted(periods - existing):
+            year, month = map(int, period.split("-"))
+            due = date(year, month, min(first.day, monthrange(year, month)[1])).isoformat()
+            db.execute("""
+                INSERT INTO expenses(user_id, description, kind, account, amount_cents, due_date, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, rule["description"], rule["kind"], rule["account"], rule["amount_cents"], due, utc_now()))
+            db.execute("INSERT INTO recurring_occurrences(recurring_id, month) VALUES (?, ?)", (rule["id"], period))
 
 
 def password_hash(password, salt=None):
@@ -144,10 +183,19 @@ class Handler(BaseHTTPRequestHandler):
                     ORDER BY lower(MIN(account))
                 """, (user["id"],)).fetchall()
             return self.send_json(HTTPStatus.OK, {"accounts": [row["account"] for row in rows]})
+        if path == "/api/recurring-expenses":
+            user = self.current_user()
+            if not user:
+                return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
+            generate_recurring(user["id"])
+            with connect() as db:
+                rows = db.execute("SELECT * FROM recurring_expenses WHERE user_id = ? AND is_active = 1 ORDER BY id DESC", (user["id"],)).fetchall()
+            return self.send_json(HTTPStatus.OK, {"recurring_expenses": [dict(row) for row in rows]})
         if path == "/api/expenses/monthly-totals":
             user = self.current_user()
             if not user:
                 return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
+            generate_recurring(user["id"])
             with connect() as db:
                 rows = db.execute("""
                     SELECT substr(due_date, 1, 7) AS month, SUM(amount_cents) AS total_cents,
@@ -161,8 +209,9 @@ class Handler(BaseHTTPRequestHandler):
             if not user:
                 return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
             month = dict(parse_qsl(urlsplit(self.path).query)).get("month", "")
-            if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+            if not valid_month(month):
                 return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Mês inválido."})
+            generate_recurring(user["id"], month)
             with connect() as db:
                 rows = db.execute("""
                     SELECT id, description, kind, account, amount_cents, due_date, is_paid
@@ -187,7 +236,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
-        if path not in {"/api/register", "/api/login", "/api/logout", "/api/expenses"}:
+        if path not in {"/api/register", "/api/login", "/api/logout", "/api/expenses", "/api/recurring-expenses"}:
             return self.send_json(HTTPStatus.NOT_FOUND, {"error": "Rota não encontrada."})
         if not self.mutation_allowed():
             return self.send_json(HTTPStatus.FORBIDDEN, {"error": "Origem não permitida."})
@@ -230,7 +279,7 @@ class Handler(BaseHTTPRequestHandler):
             with connect() as db:
                 db.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash(token),))
             return self.send_json(HTTPStatus.OK, {"ok": True}, self.cookie_header("", 0))
-        return self.save_expense(data, user)
+        return self.save_expense(data, user, recurring=path == "/api/recurring-expenses")
 
     def do_PUT(self):
         if not self.mutation_allowed():
@@ -287,7 +336,7 @@ class Handler(BaseHTTPRequestHandler):
                            [(position, expense_id, user["id"]) for position, expense_id in enumerate(ids)])
         return self.send_json(HTTPStatus.OK, {"ok": True})
 
-    def save_expense(self, data, user, expense_id=None):
+    def save_expense(self, data, user, expense_id=None, recurring=False):
         description = str(data.get("description", "")).strip()
         kind = data.get("kind")
         account = str(data.get("account", "")).strip()
@@ -300,6 +349,15 @@ class Handler(BaseHTTPRequestHandler):
         if (not 2 <= len(description) <= 120 or not isinstance(kind, str) or kind not in KINDS or not 2 <= len(account) <= 80
                 or type(amount_cents) is not int or not 0 < amount_cents <= 1_000_000_000 or not valid_date):
             return self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Confira os dados do lançamento."})
+        if recurring:
+            with connect() as db:
+                db.lock_expense_order(user["id"])
+                created_id = db.execute("""
+                    INSERT INTO recurring_expenses(user_id, description, kind, account, amount_cents, first_due_date, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
+                """, (user["id"], description, kind, account, amount_cents, due_date, utc_now())).fetchone()["id"]
+                materialize_recurring(db, user["id"], due_date[:7])
+            return self.send_json(HTTPStatus.CREATED, {"id": created_id})
         with connect() as db:
             if expense_id is not None:
                 result = db.execute("""
@@ -323,14 +381,18 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         if not self.mutation_allowed():
             return self.send_json(HTTPStatus.FORBIDDEN, {"error": "Origem não permitida."})
-        match = re.fullmatch(r"/api/expenses/(\d+)", path)
+        match = re.fullmatch(r"/api/(expenses|recurring-expenses)/(\d+)", path)
         if not match:
             return self.send_json(HTTPStatus.NOT_FOUND, {"error": "Rota não encontrada."})
         user = self.current_user()
         if not user:
             return self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Faça login para continuar."})
         with connect() as db:
-            result = db.execute("DELETE FROM expenses WHERE id = ? AND user_id = ?", (int(match.group(1)), user["id"]))
+            if match.group(1) == "recurring-expenses":
+                db.lock_expense_order(user["id"])
+                result = db.execute("UPDATE recurring_expenses SET is_active = 0 WHERE id = ? AND user_id = ? AND is_active = 1", (int(match.group(2)), user["id"]))
+            else:
+                result = db.execute("DELETE FROM expenses WHERE id = ? AND user_id = ?", (int(match.group(2)), user["id"]))
         return self.send_json(HTTPStatus.OK if result.rowcount else HTTPStatus.NOT_FOUND,
                               {"ok": True} if result.rowcount else {"error": "Lançamento não encontrado."})
 

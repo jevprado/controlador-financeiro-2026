@@ -8,8 +8,9 @@ O servidor utiliza Python, com SQLite para uso local ou PostgreSQL externo quand
 
 - Cadastro por convite para e-mails autorizados, login e encerramento de sessão.
 - Seleção do mês para consultar os lançamentos e o resumo financeiro.
-- Submenu **Dashboard**, abaixo de **Visão geral**, com período padrão de janeiro até o mês atual do ano do acesso, usando a data local do navegador. Os filtros permitem escolher outro período. O gráfico de linha mostra o total de despesas de todos os meses do intervalo, acompanhado de tabela com valores e variações mensais em reais e percentual. Os cards comparam o primeiro e o último mês. Inclui despesas pagas e pendentes; meses sem lançamentos têm total zero. Quando a referência tem total zero e há aumento, o percentual é indicado como indisponível.
+- Submenu **Dashboard**, abaixo de **Visão geral**, com período padrão de janeiro até o mês atual do ano do acesso, usando a data local do navegador. Os filtros permitem escolher outro período. O gráfico de linha mostra o total de despesas de todos os meses do intervalo, acompanhado do gráfico de barras **Evolução das despesas**, com os totais de cada mês do mesmo intervalo. Os cards comparam o primeiro e o último mês. Inclui despesas pagas e pendentes; meses sem lançamentos têm total zero. Quando a referência tem total zero e há aumento, o percentual é indicado como indisponível.
 - Criação, edição e exclusão de lançamentos com descrição, tipo, conta ou cartão, valor e data.
+- Gastos recorrentes mensais com valor fixo: cadastre em **Recorrentes → Novo gasto recorrente**, ou marque **Repetir todos os meses** ao adicionar um lançamento.
 - Tipos disponíveis: cartão de crédito, cheque especial, empréstimo e outros.
 - Sugestões de contas e cartões já utilizados pelo usuário, permitindo também digitar novos nomes.
 - Marcação de pagamento à esquerda do botão **Editar**, alternando entre **Pendente** e **Pago**.
@@ -25,6 +26,16 @@ O servidor utiliza Python, com SQLite para uso local ou PostgreSQL externo quand
 | Pendências | Soma de todos os lançamentos do mês ainda não marcados como pagos, incluindo cartões de crédito. |
 
 O card de pendências também exibe a quantidade de lançamentos pendentes. Ao marcar ou desmarcar um pagamento, o resumo é atualizado automaticamente. O estado do pagamento fica salvo e é preservado ao editar o lançamento.
+
+### Gastos recorrentes
+
+Informe a descrição (por exemplo, plano de saúde), conta, tipo, valor e data da primeira cobrança. A data define o mês inicial e o dia das próximas cobranças. Nos meses que não têm esse dia, a cobrança fica no último dia disponível; uma cobrança do dia 31 vence em 28 ou 29 de fevereiro e volta ao dia 31 em março.
+
+Ao consultar os lançamentos, o Dashboard ou a área **Recorrentes**, o servidor gera automaticamente as cobranças desde o mês inicial até o mês atual, no fuso de São Paulo. Os meses entre acessos também são preenchidos. Ao cadastrar uma recorrência com início futuro ou consultar um mês futuro nos lançamentos, a cobrança daquele mês também é gerada. Não é necessário agendador em segundo plano.
+
+Cada mês gera um único lançamento pendente e entra nos totais e gráficos normalmente. Marcar como pago, editar ou excluir uma cobrança afeta apenas aquela ocorrência. Uma cobrança excluída não reaparece nos próximos acessos. Cadastros duplicados da mesma despesa são tratados como recorrências independentes; evite cadastrar novamente uma despesa já ativa.
+
+Em **Recorrentes**, use **Encerrar recorrência** para impedir novas cobranças. Os lançamentos já gerados, inclusive de meses futuros consultados, são mantidos e podem ser editados ou excluídos individualmente. Para alterar o valor fixo das próximas cobranças, encerre a recorrência e cadastre outra com a nova data inicial, cuidando para não duplicar cobranças já geradas.
 
 ## Executar
 
@@ -153,7 +164,7 @@ Para manter os cadastros e lançamentos já existentes:
    .venv/bin/python migrate_sqlite.py data/finance.db
    ```
 
-O importador abre a origem somente para leitura e preserva IDs, vínculos dos usuários, hashes das senhas, valores em centavos, datas, ordenação e estados de pagamento. Bancos antigos sem as colunas de ordenação ou pagamento também são aceitos.
+O importador abre a origem somente para leitura e preserva IDs, vínculos dos usuários, hashes das senhas, valores em centavos, datas, ordenação, estados de pagamento e recorrências com seu histórico de geração. Bancos antigos sem as colunas de ordenação ou pagamento ou sem recorrências também são aceitos.
 
 O destino deve estar vazio: se já houver usuários, sessões ou lançamentos, a importação é recusada. Os registros são inseridos em uma única transação; uma falha desfaz as inserções. A origem não é apagada nem modificada. A criação da estrutura do destino ocorre em uma etapa anterior à importação.
 

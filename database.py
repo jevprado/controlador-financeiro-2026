@@ -104,6 +104,21 @@ def init_db(sqlite_path):
                 is_paid INTEGER NOT NULL DEFAULT 0 CHECK(is_paid IN (0, 1))
             )""",
             "CREATE INDEX IF NOT EXISTS expenses_user_date ON expenses(user_id, due_date)",
+            f"""CREATE TABLE IF NOT EXISTS recurring_expenses (
+                id {identity},
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                description TEXT NOT NULL, kind TEXT NOT NULL, account TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+                first_due_date TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+                created_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS recurring_occurrences (
+                recurring_id INTEGER NOT NULL REFERENCES recurring_expenses(id) ON DELETE CASCADE,
+                month TEXT NOT NULL,
+                PRIMARY KEY (recurring_id, month)
+            )""",
+            "CREATE INDEX IF NOT EXISTS recurring_user ON recurring_expenses(user_id)",
         ]
         for statement in statements:
             db.execute(statement)

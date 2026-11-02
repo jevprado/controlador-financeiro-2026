@@ -72,9 +72,9 @@ test('line chart includes every month from January through November and fills ga
   assert.equal(rows.length, 11);
   assert.match(rows[0].children[0].textContent, /janeiro/);
   assert.match(rows[10].children[0].textContent, /novembro/);
-  assert.equal(rows[1].children[1].children[0].textContent, 'Sem lançamentos');
-  assert.match(rows[1].children[2].textContent, /−100%/);
-  assert.match(rows[10].children[2].textContent, /percentual indisponível/);
+  assert.equal(rows[1].children[2].children[1].textContent, 'Sem lançamentos');
+  assert.equal(rows[1].children[1].children[0].style.width, '0%');
+  assert.equal(rows[10].children[1].children[0].style.width, '100%');
   assert.match(app.select('#comparison-percentage').textContent, /Aumento de 100%/);
 });
 
@@ -90,16 +90,17 @@ test('single month, empty period and a range across years render finite points',
   }
 });
 
-test('monthly variations show increases, decreases and unchanged totals', () => {
+test('bars use the same monthly totals as the line and scale against the highest total', () => {
   const app = dashboard();
   app.render('2026-01', '2026-04', [10000, 12500, 6250, 6250].map((total_cents, i) => ({
     month: `2026-0${i + 1}`, total_cents, expense_count: 1,
   })));
-  const changes = app.select('#comparison-months').children.map((row) => row.children[2].textContent);
-  assert.equal(changes[0], '—');
-  assert.match(changes[1], /\+25%/);
-  assert.match(changes[2], /−50%/);
-  assert.match(changes[3], /\(0%\)/);
+  const rows = app.select('#comparison-months').children;
+  const widths = rows.map((row) => row.children[1].children[0].style.width);
+  assert.deepEqual(widths, ['80%', '100%', '50%', '50%']);
+  assert.match(rows[0].children[2].children[0].textContent, /100,00/);
+  assert.match(rows[1].children[2].children[0].textContent, /125,00/);
+  assert.equal(rows[0].attributes.role, 'listitem');
 });
 
 test('inverted and missing ranges hide the chart and explain how to correct the range', () => {

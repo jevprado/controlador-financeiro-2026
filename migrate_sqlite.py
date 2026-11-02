@@ -18,10 +18,13 @@ def migrate(source_path):
         # Read one consistent snapshot, including older SQLite schemas.
         users = [dict(row) for row in source.execute("SELECT id, name, email, password_hash, created_at FROM users")]
         expenses = [dict(row) for row in source.execute("SELECT * FROM expenses")]
+        tables = {row["name"] for row in source.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        recurring = [dict(row) for row in source.execute("SELECT * FROM recurring_expenses")] if "recurring_expenses" in tables else []
+        occurrences = [dict(row) for row in source.execute("SELECT * FROM recurring_occurrences")] if "recurring_occurrences" in tables else []
         database.init_db(source_path)
         with database.connect(source_path) as target:
-            target.execute("LOCK TABLE users, expenses, sessions IN ACCESS EXCLUSIVE MODE")
-            for table in ("users", "expenses", "sessions"):
+            target.execute("LOCK TABLE users, expenses, sessions, recurring_expenses, recurring_occurrences IN ACCESS EXCLUSIVE MODE")
+            for table in ("users", "expenses", "sessions", "recurring_expenses", "recurring_occurrences"):
                 if target.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone():
                     raise RuntimeError("O PostgreSQL de destino deve estar vazio; nenhum registro foi importado.")
             for user in users:
@@ -37,7 +40,16 @@ def migrate(source_path):
                     "INSERT INTO expenses(" + ", ".join(columns) + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     tuple(expense[key] for key in columns),
                 )
-            for table in ("users", "expenses"):
+            recurring_columns = ("id", "user_id", "description", "kind", "account", "amount_cents", "first_due_date", "is_active", "created_at")
+            for rule in recurring:
+                target.execute(
+                    "INSERT INTO recurring_expenses(" + ", ".join(recurring_columns) + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    tuple(rule[key] for key in recurring_columns),
+                )
+            for occurrence in occurrences:
+                target.execute("INSERT INTO recurring_occurrences(recurring_id, month) VALUES (?, ?)",
+                               (occurrence["recurring_id"], occurrence["month"]))
+            for table in ("users", "expenses", "recurring_expenses"):
                 target.execute(
                     f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE(MAX(id), 1), MAX(id) IS NOT NULL) FROM {table}"
                 )

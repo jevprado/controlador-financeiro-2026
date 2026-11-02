@@ -3,6 +3,7 @@ import os
 import tempfile
 import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
@@ -229,6 +230,75 @@ class FinanceFlowTest(unittest.TestCase):
             self.assertEqual(self.call(path, cookie=owner)[1]["months"][1]["total_cents"], 42550)
             self.call(f"/api/expenses/{created['id']}", "DELETE", cookie=owner)
             self.assertEqual(self.call(path, cookie=owner)[1]["months"][1]["total_cents"], 30000)
+
+    def test_recurring_month_end_payment_edits_deletion_and_stop(self):
+        with patch.dict(os.environ, {"ALLOWED_EMAILS": "recorrente@example.com"}), patch.object(server, "current_month", return_value="2024-03"):
+            _, _, owner = self.call("/api/register", "POST", {"name": "Recorrente", "email": "recorrente@example.com", "password": "senha-segura"})
+            expense = {"description": "Plano de saúde", "kind": "Outros", "account": "Banco", "amount_cents": 50000, "due_date": "2024-01-31"}
+            status, created, _ = self.call("/api/recurring-expenses", "POST", expense, owner)
+            self.assertEqual(status, 201)
+            rule_path = f"/api/recurring-expenses/{created['id']}"
+
+            def items(month):
+                status, result, _ = self.call(f"/api/expenses?month={month}", cookie=owner)
+                self.assertEqual(status, 200)
+                return result["expenses"]
+
+            january, february, march = [items(f"2024-{month}")[0] for month in ("01", "02", "03")]
+            self.assertEqual([item["due_date"] for item in (january, february, march)], ["2024-01-31", "2024-02-29", "2024-03-31"])
+            self.assertTrue(all(item["amount_cents"] == 50000 and not item["is_paid"] for item in (january, february, march)))
+            self.call(f"/api/expenses/{january['id']}/payment", "PUT", {"is_paid": True}, owner)
+            self.assertFalse(items("2024-02")[0]["is_paid"])
+            self.call(f"/api/expenses/{january['id']}", "PUT", {**expense, "amount_cents": 60000}, owner)
+            self.assertEqual(items("2024-01")[0]["amount_cents"], 60000)
+            self.assertEqual(items("2024-02")[0]["amount_cents"], 50000)
+            self.call(f"/api/expenses/{february['id']}", "DELETE", cookie=owner)
+            server.init_db()
+            self.assertEqual(items("2024-02"), [])  # Explicit deletion must not regenerate it.
+            totals = self.call("/api/expenses/monthly-totals", cookie=owner)[1]["months"]
+            self.assertEqual([item["total_cents"] for item in totals], [60000, 50000])
+            self.assertEqual(self.call(rule_path, "DELETE", cookie=owner)[0], 200)
+            self.assertEqual(self.call("/api/recurring-expenses", cookie=owner)[1]["recurring_expenses"], [])
+            self.assertEqual(items("2024-04"), [])
+            self.assertTrue(items("2024-01")[0]["is_paid"])
+            self.assertEqual(len(items("2024-03")), 1)
+
+    def test_recurring_catches_up_without_duplicates_during_concurrent_visits(self):
+        with patch.dict(os.environ, {"ALLOWED_EMAILS": "automatico@example.com"}), patch.object(server, "current_month", return_value="2025-12"):
+            _, _, owner = self.call("/api/register", "POST", {"name": "Automático", "email": "automatico@example.com", "password": "senha-segura"})
+            expense = {"description": "Internet", "kind": "Outros", "account": "Banco", "amount_cents": 9990, "due_date": "2025-12-31"}
+            self.assertEqual(self.call("/api/recurring-expenses", "POST", expense, owner)[0], 201)
+            with patch.object(server, "current_month", return_value="2026-02"):
+                with ThreadPoolExecutor(max_workers=4) as pool:
+                    results = list(pool.map(lambda _: self.call("/api/expenses/monthly-totals", cookie=owner), range(6)))
+                for status, result, _ in results:
+                    self.assertEqual(status, 200)
+                    self.assertEqual(result["months"], [
+                        {"month": month, "total_cents": 9990, "expense_count": 1}
+                        for month in ("2025-12", "2026-01", "2026-02")
+                    ])
+                feb = self.call("/api/expenses?month=2026-02", cookie=owner)[1]["expenses"]
+                self.assertEqual(feb[0]["due_date"], "2026-02-28")
+
+    def test_recurring_validation_future_start_and_user_isolation(self):
+        with patch.dict(os.environ, {"ALLOWED_EMAILS": "regra@example.com,outra-regra@example.com"}), patch.object(server, "current_month", return_value="2026-11"):
+            _, _, owner = self.call("/api/register", "POST", {"name": "Regra", "email": "regra@example.com", "password": "senha-segura"})
+            _, _, other = self.call("/api/register", "POST", {"name": "Outra", "email": "outra-regra@example.com", "password": "senha-segura"})
+            path = "/api/recurring-expenses"
+            expense = {"description": "Aluguel", "kind": "Outros", "account": "Banco", "amount_cents": 100000, "due_date": "2027-01-10"}
+            self.assertEqual(self.call(path)[0], 401)
+            self.assertEqual(self.call(path, "POST", expense)[0], 401)
+            for invalid in ({"amount_cents": 0}, {"amount_cents": True}, {"due_date": "2026-02-30"}, {"due_date": None}, {"description": ""}, {"kind": "Inválido"}):
+                self.assertEqual(self.call(path, "POST", {**expense, **invalid}, owner)[0], 400)
+            status, created, _ = self.call(path, "POST", expense, owner)
+            self.assertEqual(status, 201)
+            self.assertEqual(len(self.call(path, cookie=owner)[1]["recurring_expenses"]), 1)
+            self.assertEqual(self.call(path, cookie=other)[1]["recurring_expenses"], [])
+            self.assertEqual(self.call(path + f"/{created['id']}", "DELETE")[0], 401)
+            self.assertEqual(self.call(path + f"/{created['id']}", "DELETE", cookie=other)[0], 404)
+            self.assertEqual(self.call("/api/expenses?month=2026-11", cookie=owner)[1]["expenses"], [])
+            self.assertEqual(len(self.call("/api/expenses?month=2027-01", cookie=owner)[1]["expenses"]), 1)
+            self.assertEqual(self.call("/api/expenses?month=2027-01", cookie=other)[1]["expenses"], [])
 
     def test_accounts_are_isolated(self):
         status, _, first = self.call("/api/register", "POST", {"name": "Ana", "email": "ana@example.com", "password": "senha-segura"})
