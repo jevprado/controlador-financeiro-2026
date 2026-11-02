@@ -8,7 +8,7 @@ O servidor utiliza Python, com SQLite para uso local ou PostgreSQL externo quand
 
 - Cadastro por convite para e-mails autorizados, login e encerramento de sessão.
 - Seleção do mês para consultar os lançamentos e o resumo financeiro.
-- Submenu **Dashboard**, abaixo de **Visão geral**, com comparação entre dois meses: totais de despesas, diferença em reais e percentual, e gráfico dos seis meses até o mês comparado. Inclui despesas pagas e pendentes; meses sem lançamentos têm total zero. Quando a referência tem total zero e há aumento, o percentual é indicado como indisponível.
+- Submenu **Dashboard**, abaixo de **Visão geral**, com período padrão de janeiro até o mês atual do ano do acesso, usando a data local do navegador. Os filtros permitem escolher outro período. O gráfico de linha mostra o total de despesas de todos os meses do intervalo, acompanhado de tabela com valores e variações mensais em reais e percentual. Os cards comparam o primeiro e o último mês. Inclui despesas pagas e pendentes; meses sem lançamentos têm total zero. Quando a referência tem total zero e há aumento, o percentual é indicado como indisponível.
 - Criação, edição e exclusão de lançamentos com descrição, tipo, conta ou cartão, valor e data.
 - Tipos disponíveis: cartão de crédito, cheque especial, empréstimo e outros.
 - Sugestões de contas e cartões já utilizados pelo usuário, permitindo também digitar novos nomes.
@@ -211,7 +211,7 @@ Para testar os fluxos HTTP pelo ponto de entrada da Vercel, inicialização do b
 
 ```bash
 TEST_VERCEL_HANDLER=1 python3 -m unittest discover -s tests -v
-node --test tests/test_api_client.cjs
+node --test tests/test_api_client.cjs tests/test_dashboard.cjs
 ```
 
 Os testes locais não executam um deployment real. A validação final deve ser feita no endereço publicado, verificando cadastro e login e os logs da Vercel.

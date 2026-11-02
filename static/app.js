@@ -48,6 +48,11 @@ function shiftMonth(value, offset) {
   return `${String(date.getUTCFullYear()).padStart(4, '0')}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+function defaultComparisonPeriod(date = new Date()) {
+  const year = String(date.getFullYear()).padStart(4, '0');
+  return { start: `${year}-01`, end: `${year}-${String(date.getMonth() + 1).padStart(2, '0')}` };
+}
+
 function showPage() {
   const comparing = location.hash === '#comparador';
   $('#inicio').classList.toggle('hidden', comparing);
@@ -71,6 +76,11 @@ function renderComparison() {
     $('#comparison-status').textContent = 'Selecione dois meses válidos para comparar.';
     return;
   }
+  if (base > target) {
+    $('#comparison-results').classList.add('hidden');
+    $('#comparison-status').textContent = 'O mês inicial deve ser anterior ou igual ao mês final.';
+    return;
+  }
   const totals = new Map(monthlyTotals.map((item) => [item.month, item]));
   const entry = (month) => totals.get(month) || { total_cents: 0, expense_count: 0 };
   for (const [key, month] of [['base', base], ['target', target]]) {
@@ -89,29 +99,70 @@ function renderComparison() {
   $('#comparison-percentage').textContent = initial === 0 && difference !== 0
     ? 'Aumento · percentual indisponível: referência com total zero.'
     : `${direction}${initial ? ` de ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(Math.abs(difference / initial * 100))}%` : ' (0%)'} em relação à referência.`;
-  const months = Array.from({ length: 6 }, (_, index) => shiftMonth(target, index - 5));
-  const maximum = Math.max(...months.map((month) => entry(month).total_cents), 1);
-  const chart = $('#comparison-chart');
-  chart.replaceChildren();
-  for (const month of months) {
-    const item = entry(month);
-    const row = makeElement('div', 'comparison-chart-row');
-    row.setAttribute('role', 'listitem');
-    const label = makeElement('span', 'comparison-chart-label', monthName(month));
-    const track = makeElement('div', 'comparison-track');
-    track.setAttribute('aria-hidden', 'true');
-    const bar = makeElement('div', 'comparison-bar');
-    bar.style.width = `${item.total_cents / maximum * 100}%`;
-    track.append(bar);
-    const value = makeElement('strong', '', money(item.total_cents));
-    const details = makeElement('div', 'comparison-chart-value');
-    details.append(value);
-    if (!item.expense_count) details.append(makeElement('small', '', 'Sem lançamentos'));
-    row.append(label, track, details);
-    chart.append(row);
-  }
+  const [startYear, startMonth] = base.split('-').map(Number);
+  const [endYear, endMonth] = target.split('-').map(Number);
+  const count = (endYear - startYear) * 12 + endMonth - startMonth + 1;
+  const months = Array.from({ length: count }, (_, index) => shiftMonth(base, index));
+  renderTrendChart(months.map((month) => ({ month, ...entry(month) })));
+  $('#comparison-period').textContent = `De ${monthName(base)} a ${monthName(target)} · totais de despesas por mês.`;
   $('#comparison-status').textContent = '';
   $('#comparison-results').classList.remove('hidden');
+}
+
+function renderTrendChart(series) {
+  const chart = $('#comparison-chart');
+  chart.replaceChildren();
+  const width = Math.max(660, series.length * 85 + 115);
+  const height = 320;
+  const left = 110;
+  const right = width - 35;
+  const top = 30;
+  const bottom = height - 55;
+  const maximum = Math.max(...series.map((item) => item.total_cents), 100);
+  const svgElement = (tag, attributes, content) => {
+    const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+    if (content !== undefined) node.textContent = content;
+    return node;
+  };
+  const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Gráfico de linha da evolução mensal das despesas. Valores e variações na tabela abaixo.' });
+  svg.style.minWidth = `${width}px`;
+  for (let step = 0; step <= 4; step++) {
+    const y = bottom - step / 4 * (bottom - top);
+    svg.append(svgElement('line', { x1: left, x2: right, y1: y, y2: y, class: 'trend-grid' }));
+    svg.append(svgElement('text', { x: left - 12, y: y + 4, 'text-anchor': 'end', class: 'trend-label' }, money(Math.round(maximum * step / 4))));
+  }
+  const points = series.map((item, index) => ({
+    x: series.length === 1 ? (left + right) / 2 : left + index / (series.length - 1) * (right - left),
+    y: bottom - item.total_cents / maximum * (bottom - top),
+  }));
+  svg.append(svgElement('polyline', { points: points.map(({ x, y }) => `${x},${y}`).join(' '), class: 'trend-line' }));
+  const rows = $('#comparison-months');
+  rows.replaceChildren();
+  series.forEach((item, index) => {
+    const { x, y } = points[index];
+    const point = svgElement('circle', { cx: x, cy: y, r: 5, class: 'trend-point', tabindex: '0', 'aria-label': `${monthName(item.month)}: ${money(item.total_cents)}${item.expense_count ? '' : ', sem lançamentos'}` });
+    point.append(svgElement('title', {}, `${monthName(item.month)}: ${money(item.total_cents)}`));
+    svg.append(point);
+    const label = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(`${item.month}-01T12:00:00Z`));
+    svg.append(svgElement('text', { x, y: bottom + 30, 'text-anchor': 'middle', class: 'trend-label' }, label));
+    const row = makeElement('tr');
+    const heading = makeElement('th', '', monthName(item.month));
+    heading.setAttribute('scope', 'row');
+    const value = makeElement('td', '', money(item.total_cents));
+    if (!item.expense_count) value.append(makeElement('small', '', 'Sem lançamentos'));
+    let change = '—';
+    if (index > 0) {
+      const previous = series[index - 1].total_cents;
+      const difference = item.total_cents - previous;
+      const sign = difference > 0 ? '+' : difference < 0 ? '−' : '';
+      const percentage = previous ? `${sign}${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(Math.abs(difference / previous * 100))}%` : difference ? 'percentual indisponível: base zero' : '0%';
+      change = `${sign}${money(Math.abs(difference))} (${percentage})`;
+    }
+    row.append(heading, value, makeElement('td', '', change));
+    rows.append(row);
+  });
+  chart.append(svg);
 }
 
 async function loadComparison() {
@@ -561,6 +612,7 @@ $('#expense-form').addEventListener('submit', async (event) => {
 });
 
 $('#month').value = today().slice(0, 7);
-$('#comparison-target').value = $('#month').value;
-$('#comparison-base').value = shiftMonth($('#month').value, -1);
+const comparisonPeriod = defaultComparisonPeriod();
+$('#comparison-target').value = comparisonPeriod.end;
+$('#comparison-base').value = comparisonPeriod.start;
 api('/api/me').then(({ user }) => user ? showDashboard(user) : showAuth()).catch(showAuth);
