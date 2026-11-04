@@ -541,10 +541,9 @@ button {
 }
 
 .topbar {
-  height: 68px;
+  display: none;
   border-bottom: 1px solid #e8ece6;
   background: #fff;
-  display: flex;
   align-items: center;
   justify-content: flex-end;
   padding: 0 54px;
@@ -1379,6 +1378,7 @@ button {
   }
 
   .topbar {
+    display: flex;
     height: 60px;
     justify-content: space-between;
     padding: 0 22px;
@@ -1393,10 +1393,6 @@ button {
     width: 27px;
     height: 27px;
     font-size: 18px;
-  }
-
-  .topbar>span {
-    display: none;
   }
 
   .topbar button {
