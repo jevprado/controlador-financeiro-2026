@@ -8,6 +8,7 @@
 /* Base e estilos globais */
 
 :root {
+  font-size: 120%;
   font-family: 'Inter',Arial,sans-serif;
   color: #202922;
   background: #f7f8f5;
@@ -47,7 +48,7 @@ button {
 
 .brand {
   font-family: 'Inter',Arial,sans-serif;
-  font-size: 29px;
+  font-size: 34.8px;
   font-weight: 800;
   letter-spacing: -2px;
   display: flex;
@@ -63,7 +64,7 @@ button {
   border-radius: 10px;
   background: #d9ef9b;
   color: #203d2e;
-  font-size: 21px;
+  font-size: 25.2px;
   letter-spacing: 0;
   margin-right: 3px;
 }
@@ -76,7 +77,7 @@ button {
 .eyebrow {
   display: block;
   color: #66825c;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 2.1px;
 }
@@ -131,7 +132,7 @@ button {
 
 .brand-content h1 {
   font-family: 'Inter',Arial,sans-serif;
-  font-size: clamp(50px,5vw,76px);
+  font-size: clamp(60px,6vw,91.2px);
   line-height: 1.14;
   letter-spacing: -5px;
   margin: 22px 0;
@@ -144,7 +145,7 @@ button {
 
 .brand-content>p {
   color: #c1d4c7;
-  font-size: 17px;
+  font-size: 20.4px;
   line-height: 1.7;
   max-width: 390px;
   margin: 0 0 50px;
@@ -222,12 +223,12 @@ button {
 .brand-card-bottom {
   border-top: 1px solid #e5ebdf;
   padding-top: 15px;
-  font-size: 12px;
+  font-size: 14.4px;
   color: #7b8c7d;
 }
 
 .brand-card-bottom span:last-child {
-  font-size: 20px;
+  font-size: 24px;
   color: #88ab6a;
 }
 
@@ -235,7 +236,7 @@ button {
   position: relative;
   z-index: 1;
   color: #93ad9d;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 2.5px;
 }
@@ -261,7 +262,7 @@ button {
 
 .auth-heading h2 {
   font-family: 'Inter',Arial,sans-serif;
-  font-size: clamp(29px,3vw,39px);
+  font-size: clamp(34.8px,3.6vw,46.8px);
   letter-spacing: -2px;
   line-height: 1.22;
   margin: 17px 0 10px;
@@ -286,7 +287,7 @@ button {
 
 .field label {
   display: block;
-  font-size: 13px;
+  font-size: 15.6px;
   font-weight: 600;
   margin-bottom: 9px;
 }
@@ -321,7 +322,7 @@ button {
 }
 
 .label-row span {
-  font-size: 11px;
+  font-size: 13.2px;
   color: #94a095;
 }
 
@@ -341,7 +342,7 @@ button {
   border: 0;
   background: none;
   color: #5f8063;
-  font-size: 12px;
+  font-size: 14.4px;
   font-weight: 600;
 }
 
@@ -374,21 +375,21 @@ button {
 }
 
 .primary-button span {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 400;
 }
 
 .form-error {
   color: #b33d35;
   min-height: 18px;
-  font-size: 12px;
+  font-size: 14.4px;
   margin: 0 0 10px;
 }
 
 .auth-switch {
   text-align: center;
   color: #859186;
-  font-size: 13px;
+  font-size: 15.6px;
   margin: 24px 0 34px;
 }
 
@@ -404,7 +405,7 @@ button {
   border-top: 1px solid #e8eee7;
   padding-top: 28px;
   text-align: center;
-  font-size: 12px;
+  font-size: 14.4px;
   color: #99a79b;
 }
 
@@ -417,7 +418,7 @@ button {
   position: absolute;
   bottom: 25px;
   color: #a9b4a9;
-  font-size: 11px;
+  font-size: 13.2px;
 }
 
 .mobile-brand {
@@ -443,13 +444,13 @@ button {
 
 .sidebar .brand {
   margin-left: 13px;
-  font-size: 25px;
+  font-size: 30px;
 }
 
 .sidebar .brand-mark {
   width: 29px;
   height: 29px;
-  font-size: 18px;
+  font-size: 21.6px;
 }
 
 .sidebar nav {
@@ -461,7 +462,7 @@ button {
 .sidebar nav a {
   text-decoration: none;
   color: #869387;
-  font-size: 13px;
+  font-size: 15.6px;
   font-weight: 600;
   padding: 13px 16px;
   border-radius: 9px;
@@ -471,7 +472,7 @@ button {
 }
 
 .sidebar nav a span {
-  font-size: 18px;
+  font-size: 21.6px;
   width: 18px;
   text-align: center;
   font-weight: 400;
@@ -517,11 +518,11 @@ button {
 }
 
 .sidebar-user strong {
-  font-size: 12px;
+  font-size: 14.4px;
 }
 
 .sidebar-user small {
-  font-size: 11px;
+  font-size: 13.2px;
   color: #9aa69c;
   margin-top: 2px;
 }
@@ -530,7 +531,7 @@ button {
   border: 0;
   background: none;
   color: #829486;
-  font-size: 23px;
+  font-size: 27.6px;
 }
 
 /* Painel: barra superior e cabeçalho */
@@ -548,7 +549,7 @@ button {
   justify-content: flex-end;
   padding: 0 54px;
   color: #a4b0a4;
-  font-size: 12px;
+  font-size: 14.4px;
 }
 
 .topbar button {
@@ -577,7 +578,7 @@ button {
 }
 
 .recurring-value {
-  font-size: 14px;
+  font-size: 16.8px;
 }
 
 .recurring-field {
@@ -592,7 +593,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 15.6px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -604,7 +605,7 @@ button {
 }
 
 .recurring-field p {
-  font-size: 12px;
+  font-size: 14.4px;
   color: #68786b;
   line-height: 1.6;
   margin-bottom: 0;
@@ -624,12 +625,12 @@ button {
 .comparison-note,
 #comparison-status {
   color: #68786b;
-  font-size: 13px;
+  font-size: 15.6px;
   line-height: 1.6;
 }
 
 #comparison-results .summary-card strong {
-  font-size: clamp(19px, 2.2vw, 28px);
+  font-size: clamp(22.8px, 2.64vw, 33.6px);
   overflow-wrap: anywhere;
 }
 
@@ -664,7 +665,7 @@ button {
 
 .trend-label {
   fill: #68786b;
-  font-size: 11px;
+  font-size: 13.2px;
 }
 
 .trend-line {
@@ -698,7 +699,7 @@ button {
   grid-template-columns: 155px minmax(0, 1fr) 145px;
   align-items: center;
   gap: 16px;
-  font-size: 13px;
+  font-size: 15.6px;
 }
 
 .comparison-chart-value {
@@ -739,13 +740,13 @@ button {
 
 .page-header h1 {
   font-family: 'Inter',Arial,sans-serif;
-  font-size: 35px;
+  font-size: 42px;
   letter-spacing: -1.8px;
   margin: 10px 0 5px;
 }
 
 .wave {
-  font-size: 23px;
+  font-size: 27.6px;
   color: #a3bc72;
   vertical-align: 3px;
 }
@@ -755,7 +756,7 @@ button {
   padding: 0 21px;
   white-space: nowrap;
   height: 44px;
-  font-size: 12px;
+  font-size: 14.4px;
 }
 
 /* Seletor de mês */
@@ -770,7 +771,7 @@ button {
   padding: 13px 17px;
   margin: 34px 0 22px;
   color: #768679;
-  font-size: 13px;
+  font-size: 15.6px;
 }
 
 .month-bar>div {
@@ -833,7 +834,7 @@ button {
   color: #2c5535;
   display: grid;
   place-items: center;
-  font-size: 20px;
+  font-size: 24px;
 }
 
 .summary-icon.lavender {
@@ -848,7 +849,7 @@ button {
 
 .summary-card p {
   color: #839184;
-  font-size: 12px;
+  font-size: 14.4px;
   margin: 24px 0 7px;
 }
 
@@ -859,14 +860,14 @@ button {
 .summary-card strong {
   display: block;
   font-family: 'Inter',Arial,sans-serif;
-  font-size: 25px;
+  font-size: 30px;
   letter-spacing: -1px;
 }
 
 .summary-card small {
   display: block;
   color: #9fac9e;
-  font-size: 11px;
+  font-size: 13.2px;
   margin-top: 7px;
 }
 
@@ -889,7 +890,7 @@ button {
 
 .section-heading h2 {
   font-family: 'Inter',Arial,sans-serif;
-  font-size: 23px;
+  font-size: 27.6px;
   letter-spacing: -.8px;
   margin: 8px 0 0;
 }
@@ -900,7 +901,7 @@ button {
   border-radius: 100px;
   padding: 8px 12px;
   color: #819082;
-  font-size: 11px;
+  font-size: 13.2px;
 }
 
 .expense-list {
@@ -921,7 +922,7 @@ button {
   border-radius: 15px;
   background: #edf5e5;
   color: #7aa36d;
-  font-size: 26px;
+  font-size: 31.2px;
   display: grid;
   place-items: center;
   margin: 0 auto 18px;
@@ -929,13 +930,13 @@ button {
 
 .empty-state h3 {
   font-family: 'Inter',Arial,sans-serif;
-  font-size: 17px;
+  font-size: 20.4px;
   margin: 0 0 8px;
 }
 
 .empty-state p {
   color: #94a095;
-  font-size: 13px;
+  font-size: 15.6px;
   margin: 0 auto 22px;
   line-height: 1.5;
 }
@@ -946,7 +947,7 @@ button {
   background: #f1f8ec;
   color: #376543;
   padding: 10px 14px;
-  font-size: 12px;
+  font-size: 14.4px;
   font-weight: 600;
 }
 
@@ -973,7 +974,7 @@ button {
   color: #507a55;
   display: grid;
   place-items: center;
-  font-size: 19px;
+  font-size: 22.8px;
 }
 
 .expense-details {
@@ -990,13 +991,13 @@ button {
 
 .expense-details strong,
 .expense-value strong {
-  font-size: 13px;
+  font-size: 15.6px;
 }
 
 .expense-details span,
 .expense-value span {
   color: #97a498;
-  font-size: 11px;
+  font-size: 13.2px;
   margin-top: 4px;
 }
 
@@ -1015,7 +1016,7 @@ button {
   border: 0;
   background: none;
   color: #b2beb2;
-  font-size: 23px;
+  font-size: 27.6px;
   padding: 0 2px;
   margin-left: 12px;
 }
@@ -1051,7 +1052,7 @@ button {
 
 .dialog-head h2 {
   font-family: 'Inter',Arial,sans-serif;
-  font-size: 24px;
+  font-size: 28.8px;
   letter-spacing: -1px;
   margin: 8px 0 0;
 }
@@ -1063,7 +1064,7 @@ button {
   width: 29px;
   height: 29px;
   color: #69806c;
-  font-size: 21px;
+  font-size: 25.2px;
   line-height: 1;
 }
 
@@ -1103,7 +1104,7 @@ button {
   border: 0;
   background: none;
   color: #819082;
-  font-size: 24px;
+  font-size: 28.8px;
   padding: 4px;
   min-width: 28px;
   min-height: 36px;
@@ -1132,7 +1133,7 @@ button {
 }
 
 .order-status {
-  font-size: 12px;
+  font-size: 14.4px;
   color: #5a6b5b;
   margin: 0 0 10px;
 }
@@ -1156,7 +1157,7 @@ button {
   gap: 6px;
   min-height: 32px;
   color: #68786b;
-  font-size: 11px;
+  font-size: 13.2px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -1195,7 +1196,7 @@ button {
   background: #f1f8ec;
   color: #376543;
   padding: 7px 8px;
-  font-size: 11px;
+  font-size: 13.2px;
   font-weight: 700;
 }
 
@@ -1235,7 +1236,7 @@ button {
   color: #25352a;
   padding: 10px 11px;
   text-align: left;
-  font-size: 13px;
+  font-size: 15.6px;
   overflow-wrap: anywhere;
 }
 
@@ -1291,7 +1292,7 @@ button {
   }
 
   .summary-card strong {
-    font-size: 21px;
+    font-size: 25.2px;
   }
 }
 
@@ -1317,7 +1318,7 @@ button {
     text-decoration: none;
     color: #486f4a;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: 14.4px;
   }
 
   .mobile-nav .nav-active {
@@ -1386,13 +1387,13 @@ button {
 
   .topbar .mobile-brand {
     display: flex;
-    font-size: 23px;
+    font-size: 27.6px;
   }
 
   .topbar .mobile-brand .brand-mark {
     width: 27px;
     height: 27px;
-    font-size: 18px;
+    font-size: 21.6px;
   }
 
   .topbar button {
@@ -1412,11 +1413,11 @@ button {
   }
 
   .page-header h1 {
-    font-size: 28px;
+    font-size: 33.6px;
   }
 
   .page-header p {
-    font-size: 12px;
+    font-size: 14.4px;
   }
 
   .compact {
@@ -1428,7 +1429,7 @@ button {
   }
 
   .compact:first-letter {
-    font-size: 22px;
+    font-size: 26.4px;
   }
 
   .month-bar {
@@ -1475,11 +1476,11 @@ button {
 
 @media (max-width: 430px) {
   .summary-card strong {
-    font-size: 18px;
+    font-size: 21.6px;
   }
 
   .summary-card p {
-    font-size: 11px;
+    font-size: 13.2px;
   }
 
   .month-bar {
@@ -1503,7 +1504,7 @@ button {
 
   .expense-details strong,
   .expense-value strong {
-    font-size: 12px;
+    font-size: 14.4px;
   }
 
   .remove-button {
