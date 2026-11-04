@@ -613,12 +613,13 @@ button {
 
 .comparison-filters {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
   margin-top: 28px;
 }
 
-.comparison-filters input {
+.comparison-filters input,
+.comparison-filters select {
   min-width: 0;
 }
 

@@ -13,6 +13,7 @@ let expenseRequest = 0;
 let comparisonRequest = 0;
 let recurringRequest = 0;
 let monthlyTotals = null;
+let comparisonAccounts = [];
 const orderStatus = makeElement('p', 'order-status');
 orderStatus.setAttribute('role', 'status');
 orderStatus.setAttribute('aria-live', 'polite');
@@ -23,6 +24,7 @@ function showAuth() {
   comparisonRequest++;
   recurringRequest++;
   monthlyTotals = null;
+  updateComparisonAccounts([]);
   currentUser = null;
   accountNames = [];
   $('#loading').classList.add('hidden');
@@ -117,6 +119,21 @@ async function loadRecurring() {
 $('#recurring-retry').addEventListener('click', loadRecurring);
 $('#new-recurring').addEventListener('click', () => openDialog(null, true));
 
+function updateComparisonAccounts(accounts) {
+  comparisonAccounts = accounts;
+  const filter = $('#comparison-account');
+  const previous = filter.value;
+  const all = makeElement('option', '', 'Todas as contas e cartões');
+  all.value = '';
+  filter.replaceChildren(all);
+  for (const item of accounts) {
+    const option = makeElement('option', '', item.account);
+    option.value = item.account;
+    filter.append(option);
+  }
+  filter.value = accounts.some((item) => item.account === previous) ? previous : '';
+}
+
 function renderComparison() {
   if (!monthlyTotals) return;
   const base = $('#comparison-base').value;
@@ -131,7 +148,8 @@ function renderComparison() {
     $('#comparison-status').textContent = 'O mês inicial deve ser anterior ou igual ao mês final.';
     return;
   }
-  const totals = new Map(monthlyTotals.map((item) => [item.month, item]));
+  const selectedAccount = comparisonAccounts.find((item) => item.account === $('#comparison-account').value);
+  const totals = new Map((selectedAccount ? selectedAccount.months : monthlyTotals).map((item) => [item.month, item]));
   const entry = (month) => totals.get(month) || { total_cents: 0, expense_count: 0 };
   for (const [key, month] of [['base', base], ['target', target]]) {
     const item = entry(month);
@@ -154,7 +172,7 @@ function renderComparison() {
   const count = (endYear - startYear) * 12 + endMonth - startMonth + 1;
   const months = Array.from({ length: count }, (_, index) => shiftMonth(base, index));
   renderTrendChart(months.map((month) => ({ month, ...entry(month) })));
-  $('#comparison-period').textContent = `De ${monthName(base)} a ${monthName(target)} · totais de despesas por mês.`;
+  $('#comparison-period').textContent = `De ${monthName(base)} a ${monthName(target)} · ${selectedAccount ? selectedAccount.account : 'Todas as contas e cartões'} · totais de despesas por mês.`;
   $('#comparison-status').textContent = '';
   $('#comparison-results').classList.remove('hidden');
 }
@@ -223,7 +241,11 @@ async function loadComparison() {
   try {
     const data = await api('/api/expenses/monthly-totals');
     if (request !== comparisonRequest || currentUser?.id !== userId) return;
+    if (!Array.isArray(data.accounts)) {
+      throw new Error('O servidor precisa ser atualizado para carregar o filtro de contas e cartões. Reinicie o servidor local ou publique a versão atualizada.');
+    }
     monthlyTotals = data.months;
+    updateComparisonAccounts(data.accounts);
     renderComparison();
   } catch (error) {
     if (request !== comparisonRequest || currentUser?.id !== userId) return;
@@ -236,6 +258,7 @@ async function loadComparison() {
 }
 $('#comparison-base').addEventListener('change', renderComparison);
 $('#comparison-target').addEventListener('change', renderComparison);
+$('#comparison-account').addEventListener('change', renderComparison);
 $('#comparison-retry').addEventListener('click', loadComparison);
 
 function setMode(next) {

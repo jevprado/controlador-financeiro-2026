@@ -212,17 +212,17 @@ class FinanceFlowTest(unittest.TestCase):
             _, _, other = self.call("/api/register", "POST", {"name": "Outro", "email": "outro-total@example.com", "password": "senha-segura"})
             path = "/api/expenses/monthly-totals"
             self.assertEqual(self.call(path)[0], 401)
-            self.assertEqual(self.call(path, cookie=owner)[1], {"months": []})
+            self.assertEqual(self.call(path, cookie=owner)[1], {"months": [], "accounts": []})
             expense = {"description": "Fatura", "kind": "Cartão de crédito", "account": "Cartão", "amount_cents": 12550, "due_date": "2025-12-15"}
             _, created, _ = self.call("/api/expenses", "POST", expense, owner)
             self.call(f"/api/expenses/{created['id']}/payment", "PUT", {"is_paid": True}, owner)
             self.call("/api/expenses", "POST", {**expense, "kind": "Outros", "amount_cents": 50}, owner)
             self.call("/api/expenses", "POST", {**expense, "amount_cents": 30000, "due_date": "2026-02-01"}, owner)
             self.call("/api/expenses", "POST", expense, other)
-            self.assertEqual(self.call(path, cookie=owner)[1], {"months": [
+            self.assertEqual(self.call(path, cookie=owner)[1]["months"], [
                 {"month": "2025-12", "total_cents": 12600, "expense_count": 2},
                 {"month": "2026-02", "total_cents": 30000, "expense_count": 1},
-            ]})
+            ])
             self.assertEqual(self.call(path, cookie=other)[1]["months"], [
                 {"month": "2025-12", "total_cents": 12550, "expense_count": 1},
             ])
@@ -230,6 +230,32 @@ class FinanceFlowTest(unittest.TestCase):
             self.assertEqual(self.call(path, cookie=owner)[1]["months"][1]["total_cents"], 42550)
             self.call(f"/api/expenses/{created['id']}", "DELETE", cookie=owner)
             self.assertEqual(self.call(path, cookie=owner)[1]["months"][1]["total_cents"], 30000)
+
+    def test_monthly_account_filter_groups_names_and_isolates_users(self):
+        with patch.dict(os.environ, {"ALLOWED_EMAILS": "filtro@example.com,outro-filtro@example.com"}):
+            _, _, owner = self.call("/api/register", "POST", {"name": "Filtro", "email": "filtro@example.com", "password": "senha-segura"})
+            _, _, other = self.call("/api/register", "POST", {"name": "Outro", "email": "outro-filtro@example.com", "password": "senha-segura"})
+            expense = {"description": "Fatura", "kind": "Cartão de crédito", "account": "Cartão Bradesco Elo", "amount_cents": 10000, "due_date": "2026-01-15"}
+            _, created, _ = self.call("/api/expenses", "POST", expense, owner)
+            self.call(f"/api/expenses/{created['id']}/payment", "PUT", {"is_paid": True}, owner)
+            self.call("/api/expenses", "POST", {**expense, "account": "cartão   bradesco ELO", "amount_cents": 5000}, owner)
+            self.call("/api/expenses", "POST", {**expense, "account": "CARTÃO BRADESCO ELO", "due_date": "2026-03-15"}, owner)
+            self.call("/api/expenses", "POST", {**expense, "account": "Outro cartão", "amount_cents": 3000}, owner)
+            self.call("/api/expenses", "POST", {**expense, "amount_cents": 99999}, other)
+            result = self.call("/api/expenses/monthly-totals", cookie=owner)[1]
+            self.assertEqual(len(result["accounts"]), 2)
+            self.assertEqual(result["accounts"][0]["account"].casefold(), "cartão bradesco elo")
+            self.assertEqual(result["accounts"][0]["months"], [
+                {"month": "2026-01", "total_cents": 15000, "expense_count": 2},
+                {"month": "2026-03", "total_cents": 10000, "expense_count": 1},
+            ])
+            self.assertEqual(result["months"][0]["total_cents"], 18000)
+            other_result = self.call("/api/expenses/monthly-totals", cookie=other)[1]
+            self.assertEqual(len(other_result["accounts"]), 1)
+            self.assertEqual(other_result["accounts"][0]["months"][0]["total_cents"], 99999)
+            self.call(f"/api/expenses/{created['id']}", "DELETE", cookie=owner)
+            updated = self.call("/api/expenses/monthly-totals", cookie=owner)[1]
+            self.assertEqual(updated["accounts"][0]["months"][0]["total_cents"], 5000)
 
     def test_recurring_month_end_payment_edits_deletion_and_stop(self):
         with patch.dict(os.environ, {"ALLOWED_EMAILS": "recorrente@example.com"}), patch.object(server, "current_month", return_value="2024-03"):

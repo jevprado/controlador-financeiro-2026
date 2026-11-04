@@ -198,12 +198,26 @@ class Handler(BaseHTTPRequestHandler):
             generate_recurring(user["id"])
             with connect() as db:
                 rows = db.execute("""
-                    SELECT substr(due_date, 1, 7) AS month, SUM(amount_cents) AS total_cents,
+                    SELECT account, substr(due_date, 1, 7) AS month, SUM(amount_cents) AS total_cents,
                         COUNT(*) AS expense_count
                     FROM expenses WHERE user_id = ?
-                    GROUP BY substr(due_date, 1, 7) ORDER BY month
+                    GROUP BY account, substr(due_date, 1, 7) ORDER BY month, account
                 """, (user["id"],)).fetchall()
-            return self.send_json(HTTPStatus.OK, {"months": [dict(row) for row in rows]})
+            months = {}
+            accounts = {}
+            for row in rows:
+                name = " ".join(row["account"].split())
+                key = name.casefold()
+                account = accounts.setdefault(key, {"account": name, "months": {}})
+                for totals in (months, account["months"]):
+                    item = totals.setdefault(row["month"], {"month": row["month"], "total_cents": 0, "expense_count": 0})
+                    item["total_cents"] += row["total_cents"]
+                    item["expense_count"] += row["expense_count"]
+            return self.send_json(HTTPStatus.OK, {
+                "months": list(months.values()),
+                "accounts": [{"account": item["account"], "months": list(item["months"].values())}
+                             for _, item in sorted(accounts.items())],
+            })
         if path == "/api/expenses":
             user = self.current_user()
             if not user:

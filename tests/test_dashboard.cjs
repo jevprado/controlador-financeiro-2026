@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function dashboard() {
+function dashboard(api = async () => ({ months: [], accounts: [] })) {
   const elements = new Map();
   function element(tag) {
     const classes = new Set();
@@ -19,7 +19,7 @@ function dashboard() {
       },
       setAttribute(name, value) { this.attributes[name] = value; },
       append(...children) { this.children.push(...children); },
-      replaceChildren() { this.children = []; },
+      replaceChildren(...children) { this.children = children; },
     };
   }
   const select = (selector) => {
@@ -28,15 +28,17 @@ function dashboard() {
   };
   const context = vm.createContext({
     document: { querySelector: select, createElement: element, createElementNS: (_, tag) => element(tag) },
+    api,
   });
   const source = fs.readFileSync(path.join(__dirname, '../static/app.js'), 'utf8');
   vm.runInContext(source.slice(0, source.indexOf('let mode')), context);
-  vm.runInContext('let monthlyTotals = [];', context);
-  for (const name of ['shiftMonth', 'defaultComparisonPeriod', 'makeElement', 'renderComparison', 'renderTrendChart']) {
+  vm.runInContext('let monthlyTotals = []; let comparisonAccounts = []; let comparisonRequest = 0; let currentUser = {id: 1};', context);
+  for (const name of ['shiftMonth', 'defaultComparisonPeriod', 'makeElement', 'updateComparisonAccounts', 'renderComparison', 'renderTrendChart']) {
     const definition = source.match(new RegExp(`^function ${name}\\([\\s\\S]*?^}`, 'm'));
     assert.ok(definition, `Missing function ${name}`);
     vm.runInContext(definition[0], context);
   }
+  vm.runInContext(source.match(/^async function loadComparison\([\s\S]*?^}/m)[0], context);
   return {
     select,
     evaluate: (code) => vm.runInContext(code, context),
@@ -111,4 +113,67 @@ test('inverted and missing ranges hide the chart and explain how to correct the 
   app.render('', '2026-11');
   assert.ok(app.select('#comparison-results').classList.contains('hidden'));
   assert.match(app.select('#comparison-status').textContent, /meses válidos/);
+});
+
+test('account options preserve the selection on refresh and clear removed accounts or session data', () => {
+  const app = dashboard();
+  app.evaluate(`updateComparisonAccounts([{account: 'Cartão Bradesco Elo', months: []}]);`);
+  const filter = app.select('#comparison-account');
+  assert.deepEqual(filter.children.map((option) => option.value), ['', 'Cartão Bradesco Elo']);
+  filter.value = 'Cartão Bradesco Elo';
+  app.evaluate(`updateComparisonAccounts([{account: 'Cartão Bradesco Elo', months: []}]);`);
+  assert.equal(filter.value, 'Cartão Bradesco Elo');
+  app.evaluate('updateComparisonAccounts([]);');
+  assert.equal(filter.value, '');
+  assert.equal(filter.children.length, 1);
+});
+
+test('loading the dashboard populates account options from the monthly totals API', async () => {
+  const app = dashboard(async (url) => {
+    assert.equal(url, '/api/expenses/monthly-totals');
+    return { months: [], accounts: [{account: 'Cartão Bradesco Elo', months: []}] };
+  });
+  app.select('#comparison-base').value = '2026-01';
+  app.select('#comparison-target').value = '2026-03';
+  await app.evaluate('loadComparison()');
+  assert.deepEqual(app.select('#comparison-account').children.map((option) => option.value), ['', 'Cartão Bradesco Elo']);
+  assert.equal(app.select('#comparison-results').classList.contains('hidden'), false);
+});
+
+test('an outdated API response explains the missing accounts instead of silently displaying an empty filter', async () => {
+  const app = dashboard(async () => ({ months: [{ month: '2026-01', total_cents: 10000, expense_count: 1 }] }));
+  await app.evaluate('loadComparison()');
+  assert.match(app.select('#comparison-status').textContent, /Reinicie o servidor local/);
+  assert.equal(app.select('#comparison-results').classList.contains('hidden'), true);
+  assert.equal(app.select('#comparison-retry').classList.contains('hidden'), false);
+});
+
+test('account filter updates both charts, totals and variation, preserving months without expenses', () => {
+  const app = dashboard();
+  app.evaluate(`comparisonAccounts = [{account: 'Cartão Bradesco Elo', months: [
+    {month: '2026-01', total_cents: 10000, expense_count: 1},
+    {month: '2026-03', total_cents: 15000, expense_count: 2}
+  ]}];`);
+  const totals = [{ month: '2026-01', total_cents: 90000, expense_count: 4 }];
+  app.select('#comparison-account').value = 'Cartão Bradesco Elo';
+  app.render('2026-01', '2026-03', totals);
+  assert.match(app.select('#comparison-base-total').textContent, /100,00/);
+  assert.match(app.select('#comparison-target-total').textContent, /150,00/);
+  assert.match(app.select('#comparison-percentage').textContent, /Aumento de 50%/);
+  assert.match(app.select('#comparison-period').textContent, /Cartão Bradesco Elo/);
+  const rows = app.select('#comparison-months').children;
+  assert.equal(rows.length, 3);
+  assert.equal(rows[1].children[2].children[1].textContent, 'Sem lançamentos');
+  assert.match(rows[2].children[2].children[0].textContent, /150,00/);
+  const points = app.select('#comparison-chart').children[0].children.filter((node) => node.tag === 'circle');
+  assert.equal(points.length, 3);
+  assert.match(points[2].attributes['aria-label'], /150,00/);
+  app.select('#comparison-account').value = '';
+  app.render('2026-01', '2026-03', totals);
+  assert.match(app.select('#comparison-base-total').textContent, /900,00/);
+  assert.match(app.select('#comparison-period').textContent, /Todas as contas/);
+  app.select('#comparison-account').value = 'Cartão Bradesco Elo';
+  app.render('2027-01', '2027-02', totals);
+  assert.match(app.select('#comparison-base-total').textContent, /0,00/);
+  assert.match(app.select('#comparison-target-total').textContent, /0,00/);
 });
