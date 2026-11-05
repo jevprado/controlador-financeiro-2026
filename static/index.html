@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f8f5">
   <title>Odarp — suas finanças em perspectiva</title>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/styles.css">
   <script src="/api.js" defer></script>
   <script src="/app.js" defer></script>
@@ -29,6 +30,7 @@
     </section>
 
     <section class="auth-panel">
+      <button class="theme-toggle" type="button" aria-pressed="false" title="Mudar para o modo escuro"><span class="theme-icon" aria-hidden="true">☾</span><span class="visually-hidden">Modo escuro</span></button>
       <div class="mobile-brand brand"><span class="brand-mark">✳</span> odarp<span class="brand-dot">.</span></div>
       <div class="auth-box">
         <div class="auth-heading">
@@ -55,10 +57,10 @@
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">✳</span> odarp<span class="brand-dot">.</span></div>
       <nav aria-label="Navegação principal"><a class="nav-active" href="#inicio"><span>▦</span> Visão geral</a><a href="#comparador"><span>↗</span> Dashboard</a><a href="#recorrentes"><span>↻</span> Recorrentes</a></nav>
-      <div class="sidebar-bottom"><div class="avatar" id="avatar">U</div><div class="sidebar-user"><strong id="sidebar-name"></strong><small>Minha conta</small></div><button id="logout" title="Sair da conta" aria-label="Sair da conta">↪</button></div>
+      <div class="sidebar-bottom"><div class="avatar" id="avatar">U</div><div class="sidebar-user"><strong id="sidebar-name"></strong><small>Minha conta</small></div><button class="theme-toggle" type="button" aria-pressed="false" title="Mudar para o modo escuro"><span class="theme-icon" aria-hidden="true">☾</span><span class="visually-hidden">Modo escuro</span></button><button id="logout" title="Sair da conta" aria-label="Sair da conta">↪</button></div>
     </aside>
     <div class="dashboard-main">
-      <header class="topbar"><div class="mobile-brand brand"><span class="brand-mark">✳</span> odarp<span class="brand-dot">.</span></div><button id="mobile-logout" type="button">Sair</button></header>
+      <header class="topbar"><div class="mobile-brand brand"><span class="brand-mark">✳</span> odarp<span class="brand-dot">.</span></div><div class="topbar-actions"><button class="theme-toggle" type="button" aria-pressed="false" title="Mudar para o modo escuro"><span class="theme-icon" aria-hidden="true">☾</span><span class="visually-hidden">Modo escuro</span></button><button id="mobile-logout" type="button">Sair</button></div></header>
       <nav class="mobile-nav" aria-label="Navegação principal no celular"><a href="#inicio">Visão geral</a><a href="#comparador">Dashboard</a><a href="#lancamentos">Lançamentos</a><a href="#recorrentes">Recorrentes</a></nav>
       <div class="content" id="inicio">
         <div class="page-header"><div><span class="eyebrow">PAINEL FINANCEIRO</span><h1>Olá, <span id="greeting-name"></span> <span class="wave">✳</span></h1><p>Seu dinheiro em perspectiva, um mês de cada vez.</p></div><button id="new-expense" class="primary-button compact" type="button">+ Novo lançamento</button></div>

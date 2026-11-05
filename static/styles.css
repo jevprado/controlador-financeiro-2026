@@ -527,7 +527,7 @@ button {
   margin-top: 2px;
 }
 
-.sidebar-bottom button {
+.sidebar-bottom #logout {
   border: 0;
   background: none;
   color: #829486;
@@ -552,7 +552,7 @@ button {
   font-size: 14.4px;
 }
 
-.topbar button {
+.topbar #mobile-logout {
   display: none;
 }
 
@@ -1269,6 +1269,57 @@ button {
   font-weight: 600;
 }
 
+/* Alternância de tema claro/escuro */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #dce5dc;
+  border-radius: 10px;
+  background: #fff;
+  color: #486f4a;
+  font-size: 18px;
+  line-height: 1;
+  transition: background .2s,border-color .2s;
+}
+
+.theme-toggle:hover {
+  background: #edf5e9;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid #376543;
+  outline-offset: 2px;
+}
+
+.auth-panel>.theme-toggle {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 /* Responsividade: tablet, celular e telas estreitas */
 
 @media (max-width: 900px) {
@@ -1397,7 +1448,7 @@ button {
     font-size: 21.6px;
   }
 
-  .topbar button {
+  .topbar #mobile-logout {
     display: block;
     border: 0;
     background: none;
@@ -1516,4 +1567,342 @@ button {
     grid-template-columns: 1fr;
     gap: 0;
   }
+}
+
+/*
+ * Modo escuro: ativado por data-theme="dark" no <html> (ver theme.js).
+ * Fica no fim do arquivo para sobrepor também as regras responsivas.
+ */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #e3ebe4;
+  background: #111814;
+}
+
+:root[data-theme="dark"] .loading-screen,
+:root[data-theme="dark"] .auth-heading p,
+:root[data-theme="dark"] .page-header p,
+:root[data-theme="dark"] .label-row span,
+:root[data-theme="dark"] .auth-switch,
+:root[data-theme="dark"] .comparison-note,
+:root[data-theme="dark"] #comparison-status,
+:root[data-theme="dark"] .recurring-field p,
+:root[data-theme="dark"] .comparison-chart-value small,
+:root[data-theme="dark"] .summary-card p,
+:root[data-theme="dark"] .empty-state p,
+:root[data-theme="dark"] .expense-details span,
+:root[data-theme="dark"] .expense-value span,
+:root[data-theme="dark"] .order-status,
+:root[data-theme="dark"] .payment-selector,
+:root[data-theme="dark"] .sidebar-user small {
+  color: #9faea1;
+}
+
+:root[data-theme="dark"] .eyebrow {
+  color: #8fb37f;
+}
+
+:root[data-theme="dark"] .eyebrow.light {
+  color: #d5edae;
+}
+
+/* Autenticação */
+
+:root[data-theme="dark"] .brand-panel {
+  background: #12291f;
+}
+
+:root[data-theme="dark"] .brand-card {
+  background: #1b2720;
+  color: #e3ebe4;
+  box-shadow: 0 24px 55px rgba(0,0,0,.4);
+}
+
+:root[data-theme="dark"] .mini-icon {
+  background: #2c4a33;
+}
+
+:root[data-theme="dark"] .brand-card-bottom {
+  border-top-color: #2a3830;
+  color: #9faea1;
+}
+
+:root[data-theme="dark"] .auth-panel {
+  background: #111814;
+}
+
+:root[data-theme="dark"] .auth-switch button,
+:root[data-theme="dark"] .password-toggle {
+  color: #9fd27f;
+}
+
+:root[data-theme="dark"] .privacy-note {
+  border-top-color: #2a3830;
+  color: #8a9b8d;
+}
+
+:root[data-theme="dark"] .auth-footnote {
+  color: #6f8072;
+}
+
+:root[data-theme="dark"] .form-error,
+:root[data-theme="dark"] #comparison-results .spending-increase {
+  color: #f08a80;
+}
+
+/* Campos e botões */
+
+:root[data-theme="dark"] .field input,
+:root[data-theme="dark"] .field select,
+:root[data-theme="dark"] .month-bar input {
+  background: #18221c;
+  border-color: #2f3f35;
+  color: #e3ebe4;
+}
+
+:root[data-theme="dark"] .field input:focus,
+:root[data-theme="dark"] .field select:focus {
+  border-color: #6fa36a;
+  box-shadow: 0 0 0 3px #24382b;
+}
+
+:root[data-theme="dark"] .field input::placeholder {
+  color: #6f8072;
+}
+
+:root[data-theme="dark"] .primary-button {
+  background: #2f6b4a;
+  box-shadow: 0 8px 18px rgba(0,0,0,.3);
+}
+
+:root[data-theme="dark"] .primary-button:hover {
+  background: #377a55;
+}
+
+:root[data-theme="dark"] .secondary-button,
+:root[data-theme="dark"] .edit-button {
+  background: #1f3326;
+  border-color: #3a5a40;
+  color: #b9e0a3;
+}
+
+:root[data-theme="dark"] .edit-button:hover {
+  background: #284230;
+}
+
+:root[data-theme="dark"] .theme-toggle {
+  background: #18221c;
+  border-color: #2f3f35;
+  color: #e6d98a;
+}
+
+:root[data-theme="dark"] .theme-toggle:hover {
+  background: #24382b;
+}
+
+:root[data-theme="dark"] .theme-toggle:focus-visible,
+:root[data-theme="dark"] .drag-handle:focus-visible,
+:root[data-theme="dark"] .payment-selector input:focus-visible,
+:root[data-theme="dark"] .edit-button:focus-visible,
+:root[data-theme="dark"] .remove-button:focus-visible {
+  outline-color: #9fd27f;
+}
+
+:root[data-theme="dark"] .recurring-field input,
+:root[data-theme="dark"] .payment-selector input {
+  accent-color: #7fbf6a;
+}
+
+/* Painel: navegação */
+
+:root[data-theme="dark"] .sidebar,
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .mobile-nav {
+  background: #18221c;
+  border-color: #2a3830;
+}
+
+:root[data-theme="dark"] .sidebar nav a {
+  color: #9faea1;
+}
+
+:root[data-theme="dark"] .sidebar nav a:hover,
+:root[data-theme="dark"] .sidebar nav .nav-active,
+:root[data-theme="dark"] .mobile-nav .nav-active {
+  color: #cfe8c0;
+  background: #24382b;
+}
+
+:root[data-theme="dark"] .mobile-nav a,
+:root[data-theme="dark"] .topbar #mobile-logout {
+  color: #b9e0a3;
+}
+
+:root[data-theme="dark"] .sidebar-bottom {
+  border-top-color: #2a3830;
+}
+
+:root[data-theme="dark"] .avatar {
+  background: #2c4a33;
+  color: #d6eca5;
+}
+
+:root[data-theme="dark"] .sidebar-bottom #logout {
+  color: #9faea1;
+}
+
+/* Painel: superfícies e cards */
+
+:root[data-theme="dark"] .month-bar,
+:root[data-theme="dark"] .summary-card,
+:root[data-theme="dark"] .expense-list,
+:root[data-theme="dark"] .recurring-row,
+:root[data-theme="dark"] .comparison-chart,
+:root[data-theme="dark"] .count-pill {
+  background: #18221c;
+  border-color: #2a3830;
+}
+
+:root[data-theme="dark"] .month-bar {
+  color: #9faea1;
+}
+
+:root[data-theme="dark"] .month-bar strong {
+  color: #e3ebe4;
+}
+
+:root[data-theme="dark"] .month-icon,
+:root[data-theme="dark"] .empty-icon,
+:root[data-theme="dark"] .expense-icon {
+  background: #24382b;
+  color: #9fd27f;
+}
+
+:root[data-theme="dark"] .summary-card.featured {
+  background: #204d37;
+  border-color: #2a5c42;
+}
+
+:root[data-theme="dark"] .summary-icon.lavender {
+  background: #2c2a45;
+  color: #b6aef0;
+}
+
+:root[data-theme="dark"] .summary-icon.peach {
+  background: #3d2e24;
+  color: #e3b38f;
+}
+
+:root[data-theme="dark"] .summary-card small,
+:root[data-theme="dark"] .count-pill {
+  color: #8a9b8d;
+}
+
+:root[data-theme="dark"] .summary-card.featured p {
+  color: #bbd2c0;
+}
+
+:root[data-theme="dark"] .summary-card.featured small {
+  color: #a8c3ad;
+}
+
+:root[data-theme="dark"] #comparison-results .spending-decrease,
+:root[data-theme="dark"] .payment-selector.is-paid {
+  color: #9fd27f;
+}
+
+:root[data-theme="dark"] .recurring-field {
+  background: #1a2a20;
+  border-color: #2f3f35;
+}
+
+/* Lançamentos */
+
+:root[data-theme="dark"] .expense-row {
+  border-bottom-color: #2a3830;
+}
+
+:root[data-theme="dark"] .expense-row.dragging {
+  background: #24382b;
+  box-shadow: inset 3px 0 #7fbf6a;
+}
+
+:root[data-theme="dark"] .drag-handle {
+  color: #8a9b8d;
+}
+
+:root[data-theme="dark"] .remove-button {
+  color: #6f8072;
+}
+
+:root[data-theme="dark"] .remove-button:hover {
+  color: #f08a80;
+}
+
+/* Gráficos */
+
+:root[data-theme="dark"] .trend-grid {
+  stroke: #2a3830;
+}
+
+:root[data-theme="dark"] .trend-label {
+  fill: #9faea1;
+}
+
+:root[data-theme="dark"] .trend-line {
+  stroke: #9fd27f;
+}
+
+:root[data-theme="dark"] .trend-point {
+  fill: #9fd27f;
+  stroke: #18221c;
+}
+
+:root[data-theme="dark"] .trend-point:focus,
+:root[data-theme="dark"] .trend-point:hover {
+  fill: #f08a80;
+  stroke: #e3ebe4;
+}
+
+:root[data-theme="dark"] .comparison-track {
+  background: #24302a;
+}
+
+:root[data-theme="dark"] .comparison-bar {
+  background: #7fae6e;
+}
+
+/* Modal e sugestões de contas */
+
+:root[data-theme="dark"] .expense-dialog {
+  background: #18221c;
+  color: #e3ebe4;
+  box-shadow: 0 25px 80px rgba(0,0,0,.55);
+}
+
+:root[data-theme="dark"] .expense-dialog::backdrop {
+  background: rgba(0,0,0,.6);
+}
+
+:root[data-theme="dark"] .close-button {
+  background: #24302a;
+  color: #9faea1;
+}
+
+:root[data-theme="dark"] .account-options {
+  background: #1f2b24;
+  border-color: #2f3f35;
+  box-shadow: 0 12px 24px rgba(0,0,0,.4);
+}
+
+:root[data-theme="dark"] .account-option {
+  background: #1f2b24;
+  color: #e3ebe4;
+}
+
+:root[data-theme="dark"] .account-option:hover,
+:root[data-theme="dark"] .account-option[aria-selected="true"] {
+  background: #24382b;
+  color: #cfe8c0;
 }

@@ -16,6 +16,7 @@ O servidor utiliza Python, com SQLite para uso local ou PostgreSQL externo quand
 - Marcação de pagamento à esquerda do botão **Editar**, alternando entre **Pendente** e **Pago**.
 - Reordenação dos lançamentos por arraste ou pelas setas para cima e para baixo quando o botão de mover está em foco. A ordem é salva por usuário e mês.
 - Interface adaptada para computadores e celulares.
+- Modo claro e modo escuro: o botão ☾/☀ na tela de login, na barra lateral ou na barra superior do celular alterna o tema. Sem escolha salva, o tema segue a preferência do sistema; a escolha fica salva no navegador.
 
 ### Resumo do mês
 
@@ -113,6 +114,7 @@ static/index.html   Estrutura das telas de acesso e painel financeiro
 static/styles.css   Estilos e adaptações para diferentes tamanhos de tela
 static/app.js       Interações, chamadas à API e cálculo dos cards
 static/api.js       Cliente HTTP e tratamento de respostas inválidas
+static/theme.js     Alternância e preferência do modo claro/escuro
 tests/test_flow.py  Testes de integração da API
 data/finance.db     Banco local criado na execução (não versionado)
 ```

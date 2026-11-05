@@ -236,7 +236,8 @@ class Handler(BaseHTTPRequestHandler):
         files = {"/": ("index.html", "text/html; charset=utf-8"),
                  "/styles.css": ("styles.css", "text/css; charset=utf-8"),
                  "/api.js": ("api.js", "text/javascript; charset=utf-8"),
-                 "/app.js": ("app.js", "text/javascript; charset=utf-8")}
+                 "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+                 "/theme.js": ("theme.js", "text/javascript; charset=utf-8")}
         if path not in files:
             return self.send_error(HTTPStatus.NOT_FOUND)
         filename, content_type = files[path]
