@@ -1,4 +1,4 @@
-# Clara — controlador financeiro pessoal
+# Odarp — controlador financeiro pessoal
 
 Aplicação local para organizar despesas por mês, acompanhar pagamentos e visualizar pendências. Cada usuário possui seus próprios lançamentos, contas e cartões.
 
@@ -68,7 +68,7 @@ PORT=8080 python3 server.py
 Exemplo com outro arquivo de dados:
 
 ```bash
-FINANCE_DB=/tmp/clara-demo.db python3 server.py
+FINANCE_DB=/tmp/odarp-demo.db python3 server.py
 ```
 
 ### Transferir dados existentes do SQLite

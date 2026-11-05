@@ -19,7 +19,7 @@ def isolated_database():
         import psycopg
         from psycopg import sql
 
-        schema = "clara_test_" + uuid.uuid4().hex
+        schema = "odarp_test_" + uuid.uuid4().hex
         parts = urlsplit(test_url)
         query = dict(parse_qsl(parts.query))
         query["options"] = f"-c search_path={schema}"
