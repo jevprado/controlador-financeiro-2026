@@ -9,6 +9,9 @@ let accountNames = [];
 let activeAccountOption = -1;
 let editingExpenseId = null;
 let savingOrder = false;
+let expenseFilter = 'all';
+let expenseSearch = '';
+let expenseSort = 'manual';
 let expenseRequest = 0;
 let comparisonRequest = 0;
 let recurringRequest = 0;
@@ -17,7 +20,7 @@ let comparisonAccounts = [];
 const orderStatus = makeElement('p', 'order-status');
 orderStatus.setAttribute('role', 'status');
 orderStatus.setAttribute('aria-live', 'polite');
-$('#expense-list').before(orderStatus);
+$('.expense-table').before(orderStatus);
 
 function showAuth() {
   expenseRequest++;
@@ -355,6 +358,9 @@ function makeExpenseIcon(kind) {
   return icon;
 }
 
+const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+const normalizeText = (text) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR');
+
 function renderSummary() {
   const total = expenses.reduce((sum, item) => sum + item.amount_cents, 0);
   const cards = expenses.filter((item) => item.kind === 'Cartão de crédito');
@@ -364,50 +370,128 @@ function renderSummary() {
   $('#total-amount').textContent = money(total);
   $('#cards-amount').textContent = money(cardsTotal);
   $('#pending-amount').textContent = money(pendingTotal);
-  $('#cards-count').textContent = `${cards.length} ${cards.length === 1 ? 'lançamento' : 'lançamentos'}`;
-  $('#pending-count').textContent = `${pending.length} ${pending.length === 1 ? 'lançamento pendente' : 'lançamentos pendentes'}`;
+  $('#total-count').textContent = expenses.length ? `${plural(expenses.length, 'compromisso', 'compromissos')} neste mês` : 'Nenhum compromisso neste mês';
+  $('#cards-count').textContent = plural(cards.length, 'lançamento', 'lançamentos');
+  $('#pending-count').textContent = pending.length ? plural(pending.length, 'pagamento pendente', 'pagamentos pendentes') : 'Nenhum pagamento pendente';
+  $('#filter-count-all').textContent = expenses.length;
+  $('#filter-count-pending').textContent = pending.length;
+  $('#filter-count-paid').textContent = expenses.length - pending.length;
+}
+
+function visibleExpenses() {
+  const query = normalizeText(expenseSearch.trim());
+  const items = expenses.filter((item) => (expenseFilter === 'all' || (expenseFilter === 'paid') === item.is_paid)
+    && (!query || normalizeText(`${item.account} ${item.description} ${item.kind}`).includes(query)));
+  if (expenseSort === 'due') items.sort((a, b) => a.due_date.localeCompare(b.due_date));
+  else if (expenseSort === 'amount') items.sort((a, b) => b.amount_cents - a.amount_cents);
+  return items;
+}
+
+function closeRowMenus() {
+  document.querySelectorAll('.row-menu-list:not(.hidden)').forEach((list) => {
+    list.classList.add('hidden');
+    list.previousElementSibling.setAttribute('aria-expanded', 'false');
+  });
+}
+document.addEventListener('click', (event) => { if (!event.target.closest('.row-menu')) closeRowMenus(); });
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  const open = document.querySelector('.row-menu-list:not(.hidden)');
+  if (!open) return;
+  closeRowMenus();
+  open.previousElementSibling.focus();
+});
+
+function makeRowMenu(item) {
+  const menu = makeElement('div', 'row-menu');
+  const more = makeElement('button', 'row-menu-button', '⋯');
+  more.type = 'button';
+  more.title = 'Mais ações';
+  more.setAttribute('aria-label', `Mais ações de ${item.account} · ${item.description}`);
+  more.setAttribute('aria-haspopup', 'menu');
+  more.setAttribute('aria-expanded', 'false');
+  const options = makeElement('div', 'row-menu-list hidden');
+  options.setAttribute('role', 'menu');
+  const edit = makeElement('button', '', 'Editar lançamento');
+  const remove = makeElement('button', 'danger', 'Excluir lançamento');
+  for (const option of [edit, remove]) {
+    option.type = 'button';
+    option.setAttribute('role', 'menuitem');
+  }
+  edit.addEventListener('click', () => { closeRowMenus(); openDialog(item); });
+  remove.addEventListener('click', async () => {
+    closeRowMenus();
+    if (!confirm(`Excluir "${item.description}"?`)) return;
+    try { await api(`/api/expenses/${item.id}`, { method: 'DELETE' }); await loadExpenses(); }
+    catch (error) { alert(error.message); }
+  });
+  more.addEventListener('click', () => {
+    const opening = options.classList.contains('hidden');
+    closeRowMenus();
+    if (!opening) return;
+    menu.classList.toggle('menu-up', more.getBoundingClientRect().bottom + 120 > window.innerHeight);
+    options.classList.remove('hidden');
+    more.setAttribute('aria-expanded', 'true');
+    edit.focus();
+  });
+  options.addEventListener('keydown', (event) => {
+    if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+    event.preventDefault();
+    (document.activeElement === edit ? remove : edit).focus();
+  });
+  options.append(edit, remove);
+  menu.append(more, options);
+  return menu;
 }
 
 function renderExpenses() {
   renderSummary();
-  $('#expense-count').textContent = `${expenses.length} ${expenses.length === 1 ? 'lançamento' : 'lançamentos'}`;
-  $('#month-label').textContent = monthName($('#month').value);
+  const label = monthName($('#month').value);
+  $('#month-label').textContent = label[0].toUpperCase() + label.slice(1);
   const list = $('#expense-list');
+  const items = visibleExpenses();
   list.replaceChildren();
-  if (!expenses.length) {
+  $('#expense-head').classList.toggle('hidden', !items.length);
+  $('#expense-footer').classList.toggle('hidden', !items.length);
+  if (!items.length) {
     const empty = makeElement('div', 'empty-state');
-    empty.append(makeElement('div', 'empty-icon', '✳'), makeElement('h3', '', 'Tudo em ordem por aqui'), makeElement('p', '', 'Adicione seu primeiro lançamento para começar a acompanhar este mês.'));
-    const button = makeElement('button', 'secondary-button', '+ Adicionar lançamento');
-    button.type = 'button';
-    button.addEventListener('click', () => openDialog());
-    empty.append(button);
+    if (expenses.length) {
+      empty.append(makeElement('h3', '', 'Nenhum lançamento encontrado'), makeElement('p', '', 'Ajuste o filtro ou a busca para ver outros lançamentos deste mês.'));
+    } else {
+      empty.append(makeElement('div', 'empty-icon', '✳'), makeElement('h3', '', 'Tudo em ordem por aqui'), makeElement('p', '', 'Adicione seu primeiro lançamento para começar a acompanhar este mês.'));
+      const button = makeElement('button', 'secondary-button', '+ Adicionar lançamento');
+      button.type = 'button';
+      button.addEventListener('click', () => openDialog());
+      empty.append(button);
+    }
     list.append(empty);
     return;
   }
-  for (const item of expenses) {
+  const filtered = items.length !== expenses.length;
+  const manualOrder = expenseSort === 'manual' && !filtered;
+  for (const item of items) {
     const row = makeElement('div', 'expense-row');
     row.dataset.id = item.id;
     const handle = makeElement('button', 'drag-handle', '⠿');
     handle.type = 'button';
     handle.setAttribute('aria-label', `Mover ${item.account}. Use as setas para cima ou para baixo para reordenar.`);
-    handle.title = 'Arraste para reordenar ou use as setas ↑ e ↓';
-    handle.disabled = expenses.length < 2;
+    handle.title = manualOrder ? 'Arraste para reordenar ou use as setas ↑ e ↓' : 'Para reordenar, mostre todos os lançamentos em ordem manual';
+    handle.disabled = !manualOrder || expenses.length < 2;
     enableExpenseDrag(handle, row);
     const icon = makeExpenseIcon(item.kind);
     const details = makeElement('div', 'expense-details');
     details.append(makeElement('strong', '', item.account), makeElement('span', '', `${item.kind} · ${item.description}`));
-    const value = makeElement('div', 'expense-value');
     const formattedDate = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', timeZone: 'UTC' }).format(new Date(`${item.due_date}T12:00:00Z`));
-    value.append(makeElement('strong', '', money(item.amount_cents)), makeElement('span', '', formattedDate));
-    const actions = makeElement('div', 'expense-actions');
-    const payment = makeElement('label', 'payment-selector');
+    const due = makeElement('span', 'expense-due', formattedDate);
+    const value = makeElement('strong', 'expense-value', money(item.amount_cents));
+    const payment = makeElement('label', 'payment-toggle');
     const paid = makeElement('input');
     paid.type = 'checkbox';
+    paid.setAttribute('role', 'switch');
     paid.checked = item.is_paid;
     paid.setAttribute('aria-label', `Pago: ${item.account} · ${item.description}`);
-    const paymentText = makeElement('span', '', item.is_paid ? 'Pago' : 'Pendente');
     payment.classList.toggle('is-paid', item.is_paid);
-    payment.append(paid, paymentText);
+    payment.append(paid, makeElement('span', 'toggle-track'), makeElement('span', 'toggle-label', item.is_paid ? 'Pago' : 'Pendente'));
     paid.addEventListener('change', async () => {
       const isPaid = paid.checked;
       paid.disabled = true;
@@ -416,36 +500,35 @@ function renderExpenses() {
           method: 'PUT', body: JSON.stringify({ is_paid: isPaid }),
         });
         item.is_paid = data.is_paid;
-        paid.checked = item.is_paid;
-        paymentText.textContent = item.is_paid ? 'Pago' : 'Pendente';
-        payment.classList.toggle('is-paid', item.is_paid);
-        renderSummary();
+        renderExpenses();
+        $(`.expense-row[data-id="${item.id}"] .payment-toggle input`)?.focus({ preventScroll: true });
       } catch (error) {
         paid.checked = item.is_paid;
-        alert(error.message);
-      } finally {
         paid.disabled = false;
+        alert(error.message);
       }
     });
-    const edit = makeElement('button', 'edit-button', 'Editar');
-    edit.type = 'button';
-    edit.setAttribute('aria-label', `Editar ${item.description}`);
-    edit.title = 'Editar lançamento';
-    edit.addEventListener('click', () => openDialog(item));
-    const remove = makeElement('button', 'remove-button', '×');
-    remove.type = 'button';
-    remove.setAttribute('aria-label', `Excluir ${item.description}`);
-    remove.title = 'Excluir lançamento';
-    remove.addEventListener('click', async () => {
-      if (!confirm(`Excluir "${item.description}"?`)) return;
-      try { await api(`/api/expenses/${item.id}`, { method: 'DELETE' }); await loadExpenses(); }
-      catch (error) { alert(error.message); }
-    });
-    actions.append(payment, edit, remove);
-    row.append(handle, icon, details, value, actions);
+    row.append(handle, icon, details, due, value, payment, makeRowMenu(item));
     list.append(row);
   }
+  const paidCount = items.filter((item) => item.is_paid).length;
+  $('#footer-count').textContent = filtered
+    ? `${items.length} de ${plural(expenses.length, 'lançamento', 'lançamentos')}`
+    : `${plural(items.length, 'lançamento', 'lançamentos')} neste mês`;
+  $('#footer-total').textContent = money(items.reduce((sum, item) => sum + item.amount_cents, 0));
+  $('#footer-status').textContent = paidCount === items.length ? (items.length === 1 ? 'Pago' : 'Todos pagos') : `${paidCount} de ${plural(items.length, 'pago', 'pagos')}`;
+  $('#footer-status').classList.toggle('is-paid', paidCount === items.length);
 }
+
+$('#expense-filters').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-filter]');
+  if (!button) return;
+  expenseFilter = button.dataset.filter;
+  for (const item of $('#expense-filters').children) item.setAttribute('aria-pressed', String(item === button));
+  renderExpenses();
+});
+$('#expense-search').addEventListener('input', (event) => { expenseSearch = event.target.value; renderExpenses(); });
+$('#expense-sort').addEventListener('change', (event) => { expenseSort = event.target.value; renderExpenses(); });
 
 async function saveExpenseOrder(focusId) {
   const ids = [...$('#expense-list').children].map((row) => Number(row.dataset.id));
@@ -543,12 +626,15 @@ async function loadExpenses() {
   }
 }
 $('#month').addEventListener('change', loadExpenses);
-$('.month-bar').addEventListener('click', () => {
+$('.month-picker').addEventListener('click', (event) => {
   const monthInput = $('#month');
-  if (monthInput.disabled) return;
+  if (monthInput.disabled || typeof monthInput.showPicker !== 'function') return;
+  event.preventDefault();
   monthInput.focus();
-  if (typeof monthInput.showPicker === 'function') monthInput.showPicker();
+  try { monthInput.showPicker(); } catch { /* o campo continua editável pelo teclado */ }
 });
+// Navegadores sem seletor de mês nativo mostram o campo de texto no lugar do rótulo.
+if ($('#month').type !== 'month') $('.month-picker').classList.add('month-picker-fallback');
 
 function closeAccountOptions() {
   $('#account-options').classList.add('hidden');
