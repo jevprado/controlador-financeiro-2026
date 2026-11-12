@@ -639,7 +639,8 @@ button {
   line-height: 1.6;
 }
 
-#comparison-results .spending-increase {
+#comparison-results .spending-increase,
+#pending-amount {
   color: #b33d35;
 }
 
@@ -1991,7 +1992,8 @@ button {
 }
 
 :root[data-theme="dark"] .form-error,
-:root[data-theme="dark"] #comparison-results .spending-increase {
+:root[data-theme="dark"] #comparison-results .spending-increase,
+:root[data-theme="dark"] #pending-amount {
   color: #f08a80;
 }
 
