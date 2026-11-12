@@ -1906,9 +1906,24 @@ button {
     padding: 0 8px;
   }
 
+  .expense-tools {
+    min-width: 0;
+    gap: 10px;
+  }
+
   .expense-search {
     flex: 1;
     min-width: 0;
+  }
+
+  /* Sem largura base, o campo de busca empurrava o seletor de ordem para fora da tela. */
+  .expense-search input {
+    width: 0;
+  }
+
+  .expense-sort {
+    flex-shrink: 0;
+    max-width: 48%;
   }
 
   #footer-count {
