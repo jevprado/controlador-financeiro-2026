@@ -66,7 +66,7 @@ function showPage() {
   $('#inicio').classList.toggle('hidden', comparing || recurring);
   $('#comparador').classList.toggle('hidden', !comparing);
   $('#recorrentes').classList.toggle('hidden', !recurring);
-  const active = recurring ? '#recorrentes' : comparing ? '#comparador' : location.hash === '#lancamentos' ? '#lancamentos' : '#inicio';
+  const active = recurring ? '#recorrentes' : comparing ? '#comparador' : '#inicio';
   document.querySelectorAll('nav a').forEach((link) => {
     link.classList.toggle('nav-active', link.hash === active);
     if (link.hash === active) link.setAttribute('aria-current', 'page');
