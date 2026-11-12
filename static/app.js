@@ -77,6 +77,21 @@ function showPage() {
 }
 window.addEventListener('hashchange', showPage);
 
+// Menu hambúrguer (somente celular): abre a navegação como um painel abaixo da barra superior.
+function setMobileMenu(open) {
+  $('.topbar').classList.toggle('menu-open', open);
+  $('#menu-toggle').setAttribute('aria-expanded', String(open));
+  $('#menu-toggle').setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
+}
+$('#menu-toggle').addEventListener('click', () => setMobileMenu($('#menu-toggle').getAttribute('aria-expanded') !== 'true'));
+$('#mobile-nav').addEventListener('click', (event) => { if (event.target.closest('a, button')) setMobileMenu(false); });
+document.addEventListener('click', (event) => { if (!event.target.closest('.topbar')) setMobileMenu(false); });
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || $('#menu-toggle').getAttribute('aria-expanded') !== 'true') return;
+  setMobileMenu(false);
+  $('#menu-toggle').focus();
+});
+
 async function loadRecurring() {
   const request = ++recurringRequest;
   const userId = currentUser?.id;

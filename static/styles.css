@@ -552,11 +552,8 @@ button {
   font-size: 14.4px;
 }
 
-.topbar #mobile-logout {
-  display: none;
-}
-
-.mobile-nav {
+.mobile-nav,
+.menu-toggle {
   display: none;
 }
 
@@ -1616,20 +1613,102 @@ button {
     flex-basis: calc(100% - 75px);
   }
 
-  .mobile-nav {
-    display: flex;
-    gap: 8px;
-    padding: 12px 20px;
-    background: #fff;
-    flex-wrap: wrap;
+  .topbar {
+    position: relative;
+    z-index: 30;
   }
 
-  .mobile-nav a {
-    padding: 10px;
+  .menu-toggle {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid #dce5dc;
+    border-radius: 10px;
+    background: #fff;
+    color: #486f4a;
+  }
+
+  /* Três traços que viram um "X" quando o menu está aberto. */
+  .menu-toggle span,
+  .menu-toggle span::before,
+  .menu-toggle span::after {
+    display: block;
+    width: 16px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    transition: transform .2s, background .2s;
+  }
+
+  .menu-toggle span {
+    position: relative;
+  }
+
+  .menu-toggle span::before,
+  .menu-toggle span::after {
+    content: '';
+    position: absolute;
+    left: 0;
+  }
+
+  .menu-toggle span::before {
+    top: -5px;
+  }
+
+  .menu-toggle span::after {
+    top: 5px;
+  }
+
+  .menu-open .menu-toggle span {
+    background: transparent;
+  }
+
+  .menu-open .menu-toggle span::before {
+    transform: translateY(5px) rotate(45deg);
+  }
+
+  .menu-open .menu-toggle span::after {
+    transform: translateY(-5px) rotate(-45deg);
+  }
+
+  .menu-toggle:focus-visible {
+    outline: 2px solid #376543;
+    outline-offset: 2px;
+  }
+
+  .menu-open .mobile-nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    display: grid;
+    gap: 4px;
+    padding: 10px 14px 14px;
+    border-bottom: 1px solid #e8ece6;
+    background: #fff;
+    box-shadow: 0 14px 24px rgba(32,41,34,.12);
+  }
+
+  .mobile-nav a,
+  .mobile-nav #mobile-logout {
+    padding: 13px 12px;
     text-decoration: none;
     color: #486f4a;
     border-radius: 8px;
-    font-size: 14.4px;
+    font-size: 15.6px;
+  }
+
+  .mobile-nav #mobile-logout {
+    margin-top: 6px;
+    border: 0;
+    border-top: 1px solid #e8ece6;
+    border-radius: 0 0 8px 8px;
+    background: none;
+    color: #b33d35;
+    font-weight: 600;
+    text-align: left;
   }
 
   .mobile-nav .nav-active {
@@ -1707,13 +1786,6 @@ button {
     font-size: 21.6px;
   }
 
-  .topbar #mobile-logout {
-    display: block;
-    border: 0;
-    background: none;
-    color: #486f4a;
-    font-weight: 700;
-  }
 
   .content {
     padding: 34px 20px;
@@ -2091,9 +2163,27 @@ button {
   background: #24382b;
 }
 
-:root[data-theme="dark"] .mobile-nav a,
-:root[data-theme="dark"] .topbar #mobile-logout {
+:root[data-theme="dark"] .mobile-nav a {
   color: #b9e0a3;
+}
+
+:root[data-theme="dark"] .menu-toggle {
+  background: #18221c;
+  border-color: #2f3f35;
+  color: #e3ebe4;
+}
+
+:root[data-theme="dark"] .mobile-nav #mobile-logout {
+  border-top-color: #2a3830;
+  color: #f08a80;
+}
+
+:root[data-theme="dark"] .menu-open .mobile-nav {
+  box-shadow: 0 14px 24px rgba(0,0,0,.45);
+}
+
+:root[data-theme="dark"] .menu-toggle:focus-visible {
+  outline-color: #9fd27f;
 }
 
 :root[data-theme="dark"] .sidebar-bottom {
